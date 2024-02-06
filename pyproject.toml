@@ -23,11 +23,11 @@ exclude = [".cache"]
 strict = ["mlx_esm/**"]
 
 [tool.ruff]
+# https://docs.astral.sh/ruff/configuration/
 line-length = 120
 indent-width = 2
 
 [tool.ruff.lint]
-# https://beta.ruff.rs/docs/configuration/
 select = ['E', 'W', 'F', 'I', 'B', 'C4', 'ARG', 'SIM']
 ignore = ['W291', 'W292', 'W293']
 
