@@ -9,7 +9,7 @@ DATA_DIR = path.join(path.dirname(__file__), path.pardir, "data")
 UNIPARC_DIR_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/uniparc/fasta/active/"
 
 
-def download_file(url: str, path: str) -> None:
+def download_file(url: str, path: str):
   response = requests.get(url)
   response.raise_for_status()
 
@@ -23,7 +23,7 @@ def extract_gz_file(gz_path: str, dest_path: str):
 
 
 class Sequence(object):
-  def __init__(self, label: str, value: str) -> None:
+  def __init__(self, label: str, value: str):
     self.label = label
     self.value = value
 
@@ -33,7 +33,7 @@ class Sequence(object):
 
 
 class SequenceDataset(object):
-  def __init__(self, sequences: list[Sequence]) -> None:
+  def __init__(self, sequences: list[Sequence]):
     self.sequences = sequences
 
   def __len__(self) -> int:
