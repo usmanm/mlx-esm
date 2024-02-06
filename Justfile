@@ -2,7 +2,7 @@ typecheck:
     poetry run pyright mlx_esm
 
 format:
-    poetry run ruff mlx_esm --fix
+    poetry run ruff --fix mlx_esm
 
 vscode:
     poetry run code .
