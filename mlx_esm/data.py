@@ -7,7 +7,9 @@ from typing import Tuple
 import requests
 
 DATA_DIR = path.join(path.dirname(__file__), path.pardir, "data")
-UNIPARC_DIR_URL = "https://ftp.uniprot.org/pub/databases/uniprot/current_release/uniparc/fasta/active/"
+UNIPARC_DIR_URL = (
+  "https://ftp.uniprot.org/pub/databases/uniprot/current_release/uniparc/fasta/active/"
+)
 
 
 def download_file(url: str, path: str):
@@ -33,65 +35,43 @@ class Sequence(object):
     return f"Sequence({visible_label}, {self.value[:15]}...)"
 
 
-class SequenceDataset(object):
-  def __init__(self, data: list[Sequence]):
-    self.data = data
+def load_uniparc_db(id: int) -> list[Sequence]:
+  assert 0 < id <= 200
 
-  def __iter__(self):
-    self.index = 0
-    return self
+  filename = "uniparc_active_p%d.fasta" % id
+  filepath = path.join(DATA_DIR, filename)
 
-  def __next__(self):
-    if self.index >= len(self.data):
-      raise StopIteration
-    result = self.data[self.index]
-    self.index += 1
-    return result
+  if not path.exists(filepath):
+    url = path.join(UNIPARC_DIR_URL, f"{filename}.gz")
+    with tempfile.NamedTemporaryFile() as tmp:
+      download_file(url, tmp.name)
+      extract_gz_file(tmp.name, filepath)
 
-  def __len__(self) -> int:
-    return len(self.data)
+  with open(filepath, "r") as f:
+    sequences: list[Sequence] = []
 
-  def __getitem__(self, idx: int) -> Sequence:
-    return self.data[idx]
+    current_label = ""
+    current_value_buf: list[str] = []
 
-  @staticmethod
-  def for_uniparc_db(id: int) -> "SequenceDataset":
-    assert 0 < id <= 200
-
-    filename = "uniparc_active_p%d.fasta" % id
-    filepath = path.join(DATA_DIR, filename)
-
-    if not path.exists(filepath):
-      url = path.join(UNIPARC_DIR_URL, f"{filename}.gz")
-      with tempfile.NamedTemporaryFile() as tmp:
-        download_file(url, tmp.name)
-        extract_gz_file(tmp.name, filepath)
-
-    with open(filepath, "r") as f:
-      sequences: list[Sequence] = []
-
+    def _flush_sequence():
+      nonlocal current_label
+      if current_label == "":
+        return
+      sequences.append(Sequence(current_label, "".join(current_value_buf)))
       current_label = ""
-      current_value_buf: list[str] = []
+      current_value_buf.clear()
 
-      def _flush_sequence():
-        nonlocal current_label
-        if current_label == "":
-          return
-        sequences.append(Sequence(current_label, "".join(current_value_buf)))
-        current_label = ""
-        current_value_buf.clear()
+    for idx, line in enumerate(f):
+      line = line.strip()
 
-      for idx, line in enumerate(f):
-        line = line.strip()
+      if line.startswith(">"):
+        _flush_sequence()
+        label = line[1:].strip()
+        current_label = label if label != "" else f"sequence:{idx}"
+      else:
+        current_value_buf.append(line)
 
-        if line.startswith(">"):
-          _flush_sequence()
-          label = line[1:].strip()
-          current_label = label if label != "" else f"sequence:{idx}"
-        else:
-          current_value_buf.append(line)
-
-    return SequenceDataset(sequences)
+  return sequences
 
 
 class Tokenizer(object):
@@ -127,12 +107,14 @@ class Tokenizer(object):
       ".",
       "-",
     )
-    self.all_toks: list[str] = sorted(list(self.prepend_toks) + list(self.append_toks) + list(self.protein_toks))
+    self.all_toks: list[str] = sorted(
+      list(self.prepend_toks) + list(self.append_toks) + list(self.protein_toks)
+    )
     assert len(self.all_toks) == len(set(self.all_toks))
 
     self.idx_to_tok = dict(enumerate(self.all_toks))
     self.tok_to_idx = {tok: idx for idx, tok in enumerate(self.all_toks)}
-    self.num_vocab = len(self.all_toks)
+    self.vocab_size = len(self.all_toks)
 
     self.unk_idx = self.tok_to_idx["<?>"]
     self.pad_idx = self.tok_to_idx["<.>"]
@@ -163,6 +145,9 @@ class Tokenizer(object):
 
       return result
 
+    # Example:
+    # -> split_on_tokens(["H", "Y"], "XYXHADHKJXXX")
+    # -> ['X', 'Y', 'X', 'H', 'AD', 'H', 'KJXXX']
     def split_on_tokens(toks: list[str], text: str) -> list[str]:
       if text == "":
         return []
@@ -179,7 +164,7 @@ class Tokenizer(object):
         curr_tokens = next_tokens
         next_tokens = []
 
-      return [tok if tok in toks else tok.strip() for tok in curr_tokens]
+      return curr_tokens
 
     return split_on_tokens(self.all_toks, sequence.value.strip())
 
