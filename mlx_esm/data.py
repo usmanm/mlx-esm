@@ -2,6 +2,7 @@ import gzip
 import shutil
 import tempfile
 from os import path
+from typing import Tuple
 
 import requests
 
@@ -33,17 +34,28 @@ class Sequence(object):
 
 
 class SequenceDataset(object):
-  def __init__(self, sequences: list[Sequence]):
-    self.sequences = sequences
+  def __init__(self, data: list[Sequence]):
+    self.data = data
+
+  def __iter__(self):
+    self.index = 0
+    return self
+
+  def __next__(self):
+    if self.index >= len(self.data):
+      raise StopIteration
+    result = self.data[self.index]
+    self.index += 1
+    return result
 
   def __len__(self) -> int:
-    return len(self.sequences)
+    return len(self.data)
 
   def __getitem__(self, idx: int) -> Sequence:
-    return self.sequences[idx]
+    return self.data[idx]
 
   @staticmethod
-  def from_uniparc(id: int):
+  def for_uniparc_db(id: int) -> "SequenceDataset":
     assert 0 < id <= 200
 
     filename = "uniparc_active_p%d.fasta" % id
@@ -80,3 +92,99 @@ class SequenceDataset(object):
           current_value_buf.append(line)
 
     return SequenceDataset(sequences)
+
+
+class Tokenizer(object):
+  def __init__(self):
+    self.prepend_toks: Tuple[str, ...] = ("<^>", "<.>", "<$>", "<?>")
+    self.append_toks: Tuple[str, ...] = ("<*>",)
+    self.protein_toks: Tuple[str, ...] = (
+      "L",
+      "A",
+      "G",
+      "V",
+      "S",
+      "E",
+      "R",
+      "T",
+      "I",
+      "D",
+      "P",
+      "K",
+      "Q",
+      "N",
+      "F",
+      "Y",
+      "M",
+      "H",
+      "W",
+      "C",
+      "X",
+      "B",
+      "U",
+      "Z",
+      "O",
+      ".",
+      "-",
+    )
+    self.all_toks: list[str] = sorted(list(self.prepend_toks) + list(self.append_toks) + list(self.protein_toks))
+    assert len(self.all_toks) == len(set(self.all_toks))
+
+    self.idx_to_tok = dict(enumerate(self.all_toks))
+    self.tok_to_idx = {tok: idx for idx, tok in enumerate(self.all_toks)}
+    self.num_vocab = len(self.all_toks)
+
+    self.unk_idx = self.tok_to_idx["<?>"]
+    self.pad_idx = self.tok_to_idx["<.>"]
+    self.cls_idx = self.tok_to_idx["<^>"]
+    self.mask_idx = self.tok_to_idx["<*>"]
+    self.eos_idx = self.tok_to_idx["<$>"]
+
+  def tokenize(self, sequence: Sequence) -> list[str]:
+    # Example:
+    # -> split_on_token("H", "XYXHADHKJXXX")
+    # -> ['XYX', 'H', 'AD', 'H', 'KJXXX']
+    def split_on_token(tok: str, text: str) -> list[str]:
+      result: list[str] = []
+      split_text = text.split(tok)
+      for i, sub_text in enumerate(split_text):
+        sub_text = sub_text.strip()
+
+        if i == len(split_text) - 1:
+          if sub_text:
+            result.append(sub_text)
+        else:
+          if sub_text:
+            result.append(sub_text)
+          result.append(tok)
+
+      assert text == "".join(result)
+      assert all(s == tok or tok not in s for s in result)
+
+      return result
+
+    def split_on_tokens(toks: list[str], text: str) -> list[str]:
+      if text == "":
+        return []
+
+      curr_tokens: list[str] = [text]
+      next_tokens: list[str] = []
+
+      for tok in toks:
+        for sub_text in curr_tokens:
+          if sub_text not in toks:
+            next_tokens.extend(split_on_token(tok, sub_text))
+          else:
+            next_tokens.append(sub_text)
+        curr_tokens = next_tokens
+        next_tokens = []
+
+      return [tok if tok in toks else tok.strip() for tok in curr_tokens]
+
+    return split_on_tokens(self.all_toks, sequence.value.strip())
+
+  def encode(self, toks: list[str]) -> list[int]:
+    return [self.tok_to_idx.get(tok, self.unk_idx) for tok in toks]
+
+  def decode(self, encoded: list[int]) -> list[str]:
+    return [self.idx_to_tok[idx] for idx in encoded]
