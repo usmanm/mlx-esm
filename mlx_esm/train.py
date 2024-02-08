@@ -3,6 +3,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional, Tuple
 
+import matplotlib.pyplot as plt
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
@@ -166,3 +167,19 @@ class Trainer(object):
     self.last_log_time = now
 
     print(f"🚂 iter={self.iter_num} duration={round(duration, 1)} loss={loss}")
+
+  def plot_loss(self, bucket_size: int = 1000):
+    xs = range(self.iter_num)
+    ys = self.losses
+
+    # We will bucket the losses to make the plot more readable.
+    bucketed_xs = range(0, len(xs), bucket_size)
+    bucketed_ys = [
+      sum(ys[i : i + bucket_size]) / bucket_size for i in range(0, len(ys), bucket_size)
+    ]
+
+    plt.xlabel("iteration")
+    plt.ylabel("loss")
+    plt.title("Training Loss")
+    plt.plot(bucketed_xs, bucketed_ys)
+    plt.show()
