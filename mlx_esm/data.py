@@ -4,6 +4,7 @@ import tempfile
 from os import path
 from typing import Tuple
 
+import mlx.core as mx
 import requests
 
 DATA_DIR = path.join(path.dirname(__file__), path.pardir, "data")
@@ -35,10 +36,14 @@ class Sequence(object):
     return f"Sequence({visible_label}, {self.value[:15]}...)"
 
 
-def load_uniparc_db(id: int) -> list[Sequence]:
-  assert 0 < id <= 200
+def load_uniparc_dbs(ids: list[int]) -> list[Sequence]:
+  return [item for _id in ids for item in load_uniparc_db(_id)]
 
-  filename = "uniparc_active_p%d.fasta" % id
+
+def load_uniparc_db(_id: int) -> list[Sequence]:
+  assert 0 < _id <= 200
+
+  filename = "uniparc_active_p%d.fasta" % _id
   filepath = path.join(DATA_DIR, filename)
 
   if not path.exists(filepath):
@@ -47,6 +52,17 @@ def load_uniparc_db(id: int) -> list[Sequence]:
       download_file(url, tmp.name)
       extract_gz_file(tmp.name, filepath)
 
+  # Example:
+  #
+  # >UPI0000000563 status=active
+  # MSGHKCSYPWDLQDRYAQDKSVVNKMQQKYWETKQAFIKATGKKEDEHVVASDADLDAKL
+  # ELFHSIQRTCLDLSKAIVLYQKRICSF
+  # >UPI00000005DE status=active
+  # MGAQDRPQCHFDIEINREPVGRIMFQLFSDICPKTCKNFLCLCSGEKGLGKTTGKKLCYK
+  # GSTFHRVVKNFMIQGGDFSEGNGKGGESIYGGYFKDENFILKHDRAFLLSMANRGKHTNG
+  # SQFFITTKPAPHLDGVHVVFGLVISGFEVIEQIENLKTDAASRPYADVRVIDCGVLATKL
+  # TKDVFEKKRKKPTCSEGSDSSSRSSSSSESSSESEVERETIRRRRHKRRPKVRHAKKRRK
+  # EMSSSEEPRRKRTVSPEG
   with open(filepath, "r") as f:
     sequences: list[Sequence] = []
 
@@ -76,51 +92,49 @@ def load_uniparc_db(id: int) -> list[Sequence]:
 
 class Tokenizer(object):
   def __init__(self):
-    self.prepend_toks: Tuple[str, ...] = ("<^>", "<.>", "<$>", "<?>")
-    self.append_toks: Tuple[str, ...] = ("<*>",)
+    # Special tokens: start of sequence, masked token, end of sequence, unknown token, padding token
+    self.special_toks: Tuple[str, ...] = ("<CLS>", "<MSK>", "<EOS>", "<UNK>", "<PAD>")
     self.protein_toks: Tuple[str, ...] = (
-      "L",
-      "A",
-      "G",
-      "V",
-      "S",
-      "E",
-      "R",
-      "T",
-      "I",
-      "D",
-      "P",
-      "K",
-      "Q",
-      "N",
-      "F",
-      "Y",
-      "M",
-      "H",
-      "W",
-      "C",
-      "X",
-      "B",
-      "U",
-      "Z",
-      "O",
-      ".",
       "-",
+      ".",
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "I",
+      "K",
+      "L",
+      "M",
+      "N",
+      "O",
+      "P",
+      "Q",
+      "R",
+      "S",
+      "T",
+      "U",
+      "V",
+      "W",
+      "X",
+      "Y",
+      "Z",
     )
-    self.all_toks: list[str] = sorted(
-      list(self.prepend_toks) + list(self.append_toks) + list(self.protein_toks)
-    )
+    self.all_toks: list[str] = sorted(list(self.special_toks) + list(self.protein_toks))
     assert len(self.all_toks) == len(set(self.all_toks))
 
     self.idx_to_tok = dict(enumerate(self.all_toks))
     self.tok_to_idx = {tok: idx for idx, tok in enumerate(self.all_toks)}
     self.vocab_size = len(self.all_toks)
 
-    self.unk_idx = self.tok_to_idx["<?>"]
-    self.pad_idx = self.tok_to_idx["<.>"]
-    self.cls_idx = self.tok_to_idx["<^>"]
-    self.mask_idx = self.tok_to_idx["<*>"]
-    self.eos_idx = self.tok_to_idx["<$>"]
+    self.unk_idx = self.tok_to_idx["<UNK>"]
+    self.pad_idx = self.tok_to_idx["<PAD>"]
+    self.cls_idx = self.tok_to_idx["<CLS>"]
+    self.mask_idx = self.tok_to_idx["<MSK>"]
+    self.eos_idx = self.tok_to_idx["<EOS>"]
 
   def tokenize(self, sequence: Sequence) -> list[str]:
     # Example:
@@ -168,8 +182,58 @@ class Tokenizer(object):
 
     return split_on_tokens(self.all_toks, sequence.value.strip())
 
-  def encode(self, toks: list[str]) -> list[int]:
-    return [self.tok_to_idx.get(tok, self.unk_idx) for tok in toks]
+  def encode(self, toks: list[str]) -> mx.array:
+    # If token is not present, treat it as "unknown" token.
+    return mx.array([self.tok_to_idx.get(tok, self.unk_idx) for tok in toks], dtype=mx.int32)
 
-  def decode(self, encoded: list[int]) -> list[str]:
-    return [self.idx_to_tok[idx] for idx in encoded]
+  def decode(self, encoded: mx.array) -> list[str]:
+    return [self.idx_to_tok[idx] for idx in encoded.tolist()]
+
+
+class BatchTokenizer(object):
+  def __init__(self, context_size: int = 128, dynamic_padding: bool = False):
+    self.tokenizer = Tokenizer()
+    self.context_size = context_size
+    self.dynamic_padding = dynamic_padding
+
+  def encode(self, sequences: list[Sequence]) -> mx.array:
+    tokenizer = self.tokenizer
+
+    batch_size = len(sequences)
+    tokenized_batch = [tokenizer.encode(tokenizer.tokenize(seq)) for seq in sequences]
+
+    # Truncate the tokenized sequences such that they fit within the
+    # context. For that, we need to subtract 2 to account for the CLS
+    # and EOS tokens.
+    max_trunc_len = self.context_size - 2
+
+    if self.dynamic_padding:
+      max_token_len = max(len(toks) for toks in tokenized_batch)
+      trunc_len = min(max_trunc_len, max_token_len)
+    else:
+      trunc_len = max_trunc_len
+
+    truncated_tokenized_batch = [toks[:trunc_len] for toks in tokenized_batch]
+
+    # B = size of batch, L = max length of sequence in batch + CLS + EOS
+    shape = (batch_size, trunc_len + 2)
+
+    # (B x L) -> filled with padding token
+    tokens = mx.full(shape, tokenizer.pad_idx, dtype=mx.int32)
+
+    # Fill the tokens tensor with the actual protein sequence tokens, making
+    # sure to add a "start of sequence" token at the beginning and an "end of
+    # sequence" token at the end. We are using a "pad-right" strategy, because
+    # BERT is a model with absolute position embeddings so it’s usually advised
+    # to pad the inputs on the right rather than the left.
+    #
+    # https://huggingface.co/docs/transformers/model_doc/bert#usage-tips
+    for idx, toks in enumerate(truncated_tokenized_batch):
+      # First token of each sequence is the "start of sequence" token.
+      tokens[idx, 0] = tokenizer.cls_idx
+      # Then fill in the actual protein sequence tokens.
+      tokens[idx, 1 : len(toks) + 1] = mx.array(toks)
+      # Finally, the last token of each sequence is the "end of sequence" token.
+      tokens[idx, len(toks) + 1] = tokenizer.eos_idx
+
+    return tokens
