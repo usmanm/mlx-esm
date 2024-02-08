@@ -23,8 +23,8 @@ class Embedding(nn.Module):
 
 
 class MLP(Base):
-  # NB: This is a simple MLP model with 2 hidden layers. Implementing this to
-  # make sure the training loop works.
+  # NB: This is a simple MLP model with a single hidden layers. Implementing this to
+  # make sure the training pipeline works.
   def __init__(
     self,
     embed_dims: int = 16,
