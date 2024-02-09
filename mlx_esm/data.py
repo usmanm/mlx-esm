@@ -83,7 +83,7 @@ def load_uniparc_db(_id: int) -> list[str]:
 class Tokenizer(object):
   def __init__(self):
     # Special tokens: start of sequence, masked token, end of sequence, unknown token, padding token
-    self.special_toks: Tuple[str, ...] = ("^", "*", "$", "?", " ")
+    self.special_toks: Tuple[str, ...] = ("^", "*", "$", "?", "%")
     self.protein_toks: Tuple[str, ...] = (
       "-",
       ".",
@@ -121,7 +121,7 @@ class Tokenizer(object):
     self.vocab_size = len(self.all_toks)
 
     self.unk_idx = self.tok_to_idx["?"]
-    self.pad_idx = self.tok_to_idx[" "]
+    self.pad_idx = self.tok_to_idx["%"]
     self.cls_idx = self.tok_to_idx["^"]
     self.mask_idx = self.tok_to_idx["*"]
     self.eos_idx = self.tok_to_idx["$"]

@@ -1,14 +1,16 @@
 import mlx.core as mx
-import mlx.nn as nn
 import numpy as np
 
 from mlx_esm.data import Tokenizer
 from mlx_esm.model import Base
 
 
-def generate(model: Base, max_iters: int = 100) -> str:
+def generate(model: Base, length: int = 32, max_iters: int = 100) -> str:
   # And then god said, let there be more proteins.
-  start_seq = "^" + "*" * (model.context_size - 1)
+  mask_len = min(model.context_size - 1, length)
+
+  pad_len = model.context_size - mask_len - 2
+  start_seq = "^" + "*" * min(model.context_size - 1, length) + "$" + "%" * pad_len
   return impl(model, start_seq, max_iters)
 
 
@@ -27,11 +29,6 @@ def impl(model: Base, input: str, max_iters: int) -> str:
   model.eval()
   mx.eval(model.parameters())
 
-  def eval_fn(model: Base, x: mx.array) -> mx.array:
-    return model(x)
-
-  logits_and_grad_fn = nn.value_and_grad(model, eval_fn)
-
   iter_num = 0
   toks = tokenizer.encode(input)
   x = mx.array([mx.array(toks)], dtype=mx.int32)
@@ -42,15 +39,16 @@ def impl(model: Base, input: str, max_iters: int) -> str:
     toks = x[0]
 
     iter_num += 1
-    if tokenizer.mask_idx not in toks.tolist():
+    if is_sequence_legit(tokenizer, toks):
       break
 
     # forward the model
-    logits, _ = logits_and_grad_fn(model, x)
+    logits = model(x)
     x = logits_to_next_x(logits)
-    print_sequence(tokenizer, toks, "🕐")
+    if iter_num > 0:
+      print_sequence(tokenizer, toks, "🕐")
 
-  emoji = "🌳" if is_sequence_legit(tokenizer, toks) else "🤷‍♂️"
+  emoji = "🌳" if is_sequence_legit(tokenizer, toks) else "🍂"
   return print_sequence(tokenizer, toks, emoji)
 
 
@@ -70,7 +68,7 @@ def logits_to_next_x(logits: mx.array) -> mx.array:
 
 
 def print_sequence(tokenizer: Tokenizer, toks: mx.array, emoji: str) -> str:
-  s = "".join(tokenizer.decode(toks)).strip().replace("^", "").replace("$", "")
+  s = "".join(tokenizer.decode(toks)).strip()
   print(emoji + " " + s)
   return s
 

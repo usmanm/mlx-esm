@@ -26,6 +26,9 @@ class Embedding(nn.Module):
     x = x.reshape(x.shape[0], -1)
     return x
 
+  def __repr__(self):
+    return f"Embedding(num_embeddings={self.weight.shape[0]}, dims={self.weight.shape[1]})"
+
 
 class MLP(Base):
   # NB: This is a simple MLP model with a single hidden layers. Implementing this to
@@ -86,10 +89,3 @@ class ESM1(Base):
     self.embed_dims = embed_dims
     self.num_attn_heads = num_attn_heads
     self.vocab_size = vocab_size
-
-    # TODO: there is no equivalent for padding_idx in MLX. Figure out a way to
-    # disable it during training.
-    self.embed = nn.Embedding(vocab_size, embed_dims)
-
-  def __call__(self, x: mx.array) -> mx.array:
-    raise NotImplementedError
