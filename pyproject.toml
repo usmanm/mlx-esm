@@ -9,22 +9,21 @@ readme = "README.md"
 python = "^3.11"
 mlx = "^0.1.0"
 requests = "^2.31.0"
-
-[tool.poetry.group.dev.dependencies]
 ruff = "^0.2.1"
 pyright = "^1.1.350"
 jupyterlab = "^4.1.0"
 ipython = "^8.21.0"
+matplotlib = "^3.8.2"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
 useLibraryCodeForTypes = true
 exclude = [".cache"]
-strict = ["mlx_esm/**"]
+# strict = ["mlx_esm/**"]
 
 [tool.ruff]
 # https://docs.astral.sh/ruff/configuration/
-line-length = 120
+line-length = 100
 indent-width = 2
 
 [tool.ruff.lint]
