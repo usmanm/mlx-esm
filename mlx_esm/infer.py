@@ -6,13 +6,21 @@ from mlx_esm.data import Tokenizer
 from mlx_esm.model import Base
 
 
-def unmask(
-  model: Base,
-  masked_seq: str,
-  max_iters: int = 100,
-) -> str:
+def generate(model: Base, max_iters: int = 100) -> str:
+  # And then god said, let there be more proteins.
+  start_seq = "^" + (" " * model.context_size)
+  return impl(model, start_seq, max_iters)
+
+
+def unmask(model: Base, masked_seq: str, max_iters: int = 100) -> str:
   if len(masked_seq) > model.max_seq_len:
     raise ValueError("sequence exceeds context size")
+  return impl(model, f"^{masked_seq}$", max_iters)
+
+
+def impl(model: Base, input: str, max_iters: int) -> str:
+  if len(input) > model.context_size:
+    raise ValueError("input exceeds context size")
 
   tokenizer = Tokenizer()
 
@@ -25,8 +33,7 @@ def unmask(
   logits_and_grad_fn = nn.value_and_grad(model, eval_fn)
 
   iter_num = 0
-  start_seq = f"^{masked_seq}$"
-  toks = tokenizer.encode(start_seq)
+  toks = tokenizer.encode(input)
   x = mx.array([mx.array(toks)], dtype=mx.int32)
 
   print_sequence(tokenizer, toks, "🌱")
