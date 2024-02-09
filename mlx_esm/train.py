@@ -8,7 +8,7 @@ import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
 
-from mlx_esm.data import BatchTokenizer, Sequence, load_uniparc_dbs
+from mlx_esm.data import BatchTokenizer, load_uniparc_dbs
 from mlx_esm.model import MLP, Base
 
 
@@ -45,16 +45,16 @@ class TrainingLoader(object):
       context_size=context_size,
       dynamic_padding=dynamic_padding,
     )
-    self.data: Optional[list[Sequence]] = None
+    self.data: Optional[list[str]] = None
     self.dynamic_padding = dynamic_padding
 
   def load(self):
     sequences = load_uniparc_dbs(self.dbs)
     # We filter out sequences that are too long to fit in the context size.
     # Subtracting 2 from the context size to account for the CLS and EOS tokens.
-    data = [s for s in sequences if len(s.value) <= self.context_size - 2]
+    data = [s for s in sequences if len(s) <= self.context_size - 2]
     if self.dynamic_padding:
-      data = sorted(data, key=lambda s: len(s.value))
+      data = sorted(data, key=lambda s: len(s))
     self.data = data
 
   def vocab_size(self) -> int:
@@ -64,7 +64,7 @@ class TrainingLoader(object):
     if self.data is None:
       raise Exception("data has not been loaded yet")
 
-    batch: list[Sequence] = random.sample(self.data, self.batch_size)
+    batch: list[str] = random.sample(self.data, self.batch_size)
 
     encoded = self.batch_tokenizer.encode(batch)
     shape: list[int] = list(encoded.shape)
@@ -155,7 +155,7 @@ class Trainer(object):
 
       self.log_metrics(loss.item())
 
-  def log_metrics(self, loss: float):
+  def log_metrics(self, loss: float, bucket_size: int = 1000):
     self.iter_num += 1
     self.losses.append(loss)
 
@@ -166,7 +166,10 @@ class Trainer(object):
     duration = now - self.last_log_time
     self.last_log_time = now
 
-    print(f"🚂 iter={self.iter_num} duration={round(duration, 1)} loss={loss}")
+    losses = self.losses[-bucket_size:]
+    avg_loss = sum(losses) / len(losses)
+
+    print(f"🚂 iter={self.iter_num} duration={round(duration, 1)} loss={avg_loss}")
 
   def plot_loss(self, bucket_size: int = 1000):
     xs = range(self.iter_num)

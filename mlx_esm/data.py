@@ -26,21 +26,11 @@ def extract_gz_file(gz_path: str, dest_path: str):
     shutil.copyfileobj(f_in, f_out)
 
 
-class Sequence(object):
-  def __init__(self, label: str, value: str):
-    self.label = label
-    self.value = value
-
-  def __repr__(self) -> str:
-    visible_label = self.label.split(" ")[0]
-    return f"Sequence({visible_label}, {self.value[:15]}...)"
-
-
-def load_uniparc_dbs(ids: list[int]) -> list[Sequence]:
+def load_uniparc_dbs(ids: list[int]) -> list[str]:
   return [item for _id in ids for item in load_uniparc_db(_id)]
 
 
-def load_uniparc_db(_id: int) -> list[Sequence]:
+def load_uniparc_db(_id: int) -> list[str]:
   assert 0 < _id <= 200
 
   filename = "uniparc_active_p%d.fasta" % _id
@@ -64,7 +54,7 @@ def load_uniparc_db(_id: int) -> list[Sequence]:
   # TKDVFEKKRKKPTCSEGSDSSSRSSSSSESSSESEVERETIRRRRHKRRPKVRHAKKRRK
   # EMSSSEEPRRKRTVSPEG
   with open(filepath, "r") as f:
-    sequences: list[Sequence] = []
+    sequences: list[str] = []
 
     current_label = ""
     current_value_buf: list[str] = []
@@ -73,7 +63,7 @@ def load_uniparc_db(_id: int) -> list[Sequence]:
       nonlocal current_label
       if current_label == "":
         return
-      sequences.append(Sequence(current_label, "".join(current_value_buf)))
+      sequences.append("".join(current_value_buf))
       current_label = ""
       current_value_buf.clear()
 
@@ -93,7 +83,7 @@ def load_uniparc_db(_id: int) -> list[Sequence]:
 class Tokenizer(object):
   def __init__(self):
     # Special tokens: start of sequence, masked token, end of sequence, unknown token, padding token
-    self.special_toks: Tuple[str, ...] = ("<CLS>", "<MSK>", "<EOS>", "<UNK>", "<PAD>")
+    self.special_toks: Tuple[str, ...] = ("^", "*", "$", "?", " ")
     self.protein_toks: Tuple[str, ...] = (
       "-",
       ".",
@@ -130,13 +120,13 @@ class Tokenizer(object):
     self.tok_to_idx = {tok: idx for idx, tok in enumerate(self.all_toks)}
     self.vocab_size = len(self.all_toks)
 
-    self.unk_idx = self.tok_to_idx["<UNK>"]
-    self.pad_idx = self.tok_to_idx["<PAD>"]
-    self.cls_idx = self.tok_to_idx["<CLS>"]
-    self.mask_idx = self.tok_to_idx["<MSK>"]
-    self.eos_idx = self.tok_to_idx["<EOS>"]
+    self.unk_idx = self.tok_to_idx["?"]
+    self.pad_idx = self.tok_to_idx[" "]
+    self.cls_idx = self.tok_to_idx["^"]
+    self.mask_idx = self.tok_to_idx["*"]
+    self.eos_idx = self.tok_to_idx["$"]
 
-  def tokenize(self, sequence: Sequence) -> list[str]:
+  def tokenize(self, sequence: str) -> list[str]:
     # Example:
     # -> split_on_token("H", "XYXHADHKJXXX")
     # -> ['XYX', 'H', 'AD', 'H', 'KJXXX']
@@ -180,9 +170,10 @@ class Tokenizer(object):
 
       return curr_tokens
 
-    return split_on_tokens(self.all_toks, sequence.value.strip())
+    return split_on_tokens(self.all_toks, sequence.strip())
 
-  def encode(self, toks: list[str]) -> mx.array:
+  def encode(self, seq: str) -> mx.array:
+    toks = self.tokenize(seq)
     # If token is not present, treat it as "unknown" token.
     return mx.array([self.tok_to_idx.get(tok, self.unk_idx) for tok in toks], dtype=mx.int32)
 
@@ -196,11 +187,11 @@ class BatchTokenizer(object):
     self.context_size = context_size
     self.dynamic_padding = dynamic_padding
 
-  def encode(self, sequences: list[Sequence]) -> mx.array:
+  def encode(self, sequences: list[str]) -> mx.array:
     tokenizer = self.tokenizer
 
     batch_size = len(sequences)
-    tokenized_batch = [tokenizer.encode(tokenizer.tokenize(seq)) for seq in sequences]
+    tokenized_batch = [tokenizer.encode(seq) for seq in sequences]
 
     # Truncate the tokenized sequences such that they fit within the
     # context. For that, we need to subtract 2 to account for the CLS

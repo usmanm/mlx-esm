@@ -3,6 +3,11 @@ import mlx.nn as nn
 
 
 class Base(nn.Module):
+  def __init__(self, content_size: int):
+    super(Base, self).__init__()
+    self.context_size = content_size
+    self.max_seq_len = content_size - 2
+
   def __call__(self, _: mx.array) -> mx.array:
     raise NotImplementedError
 
@@ -32,11 +37,10 @@ class MLP(Base):
     vocab_size: int = 32,
     context_size: int = 128,
   ):
-    super(MLP, self).__init__()
+    super(MLP, self).__init__(context_size)
 
     self.embed_dims = embed_dims
     self.vocab_size = vocab_size
-    self.context_size = context_size
     self.hidden_dims = hidden_dims
 
     output_size = vocab_size * context_size
@@ -74,8 +78,9 @@ class ESM1(Base):
     embed_dims: int = 128,
     num_attn_heads: int = 4,
     vocab_size: int = 32,
+    content_size: int = 128,
   ):
-    super(ESM1, self).__init__()
+    super(ESM1, self).__init__(content_size)
 
     self.num_layers = num_layers
     self.embed_dims = embed_dims
