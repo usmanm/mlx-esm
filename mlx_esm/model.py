@@ -3,6 +3,11 @@ import mlx.nn as nn
 
 
 class Base(nn.Module):
+  def __init__(self, content_size: int):
+    super(Base, self).__init__()
+    self.context_size = content_size
+    self.max_seq_len = content_size - 2
+
   def __call__(self, _: mx.array) -> mx.array:
     raise NotImplementedError
 
@@ -21,6 +26,9 @@ class Embedding(nn.Module):
     x = x.reshape(x.shape[0], -1)
     return x
 
+  def __repr__(self):
+    return f"Embedding(num_embeddings={self.weight.shape[0]}, dims={self.weight.shape[1]})"
+
 
 class MLP(Base):
   # NB: This is a simple MLP model with a single hidden layers. Implementing this to
@@ -32,11 +40,10 @@ class MLP(Base):
     vocab_size: int = 32,
     context_size: int = 128,
   ):
-    super(MLP, self).__init__()
+    super(MLP, self).__init__(context_size)
 
     self.embed_dims = embed_dims
     self.vocab_size = vocab_size
-    self.context_size = context_size
     self.hidden_dims = hidden_dims
 
     output_size = vocab_size * context_size
@@ -74,17 +81,11 @@ class ESM1(Base):
     embed_dims: int = 128,
     num_attn_heads: int = 4,
     vocab_size: int = 32,
+    content_size: int = 128,
   ):
-    super(ESM1, self).__init__()
+    super(ESM1, self).__init__(content_size)
 
     self.num_layers = num_layers
     self.embed_dims = embed_dims
     self.num_attn_heads = num_attn_heads
     self.vocab_size = vocab_size
-
-    # TODO: there is no equivalent for padding_idx in MLX. Figure out a way to
-    # disable it during training.
-    self.embed = nn.Embedding(vocab_size, embed_dims)
-
-  def __call__(self, x: mx.array) -> mx.array:
-    raise NotImplementedError

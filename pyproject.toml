@@ -5,6 +5,9 @@ description = "Implementation of Meta's esm in mlx"
 authors = ["Usman Masood <usmanm@fastmail.fm>"]
 readme = "README.md"
 
+[tool.poetry.scripts]
+cli = "mlx_esm.cli:main"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 mlx = "^0.1.0"
@@ -14,6 +17,8 @@ pyright = "^1.1.350"
 jupyterlab = "^4.1.0"
 ipython = "^8.21.0"
 matplotlib = "^3.8.2"
+numpy = "^1.26.4"
+click = "^8.1.7"
 
 [tool.pyright]
 # https://github.com/microsoft/pyright/blob/main/docs/configuration.md
