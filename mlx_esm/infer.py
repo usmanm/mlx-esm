@@ -8,7 +8,7 @@ from mlx_esm.model import Base
 
 def generate(model: Base, max_iters: int = 100) -> str:
   # And then god said, let there be more proteins.
-  start_seq = "^" + (" " * model.context_size)
+  start_seq = "^" + "*" * (model.context_size - 1)
   return impl(model, start_seq, max_iters)
 
 
@@ -50,7 +50,7 @@ def impl(model: Base, input: str, max_iters: int) -> str:
     x = logits_to_next_x(logits)
     print_sequence(tokenizer, toks, "🕐")
 
-  emoji = "🌳" if tokenizer.mask_idx not in toks.tolist() else "🤷‍♂️"
+  emoji = "🌳" if is_sequence_legit(tokenizer, toks) else "🤷‍♂️"
   return print_sequence(tokenizer, toks, emoji)
 
 
@@ -73,3 +73,20 @@ def print_sequence(tokenizer: Tokenizer, toks: mx.array, emoji: str) -> str:
   s = "".join(tokenizer.decode(toks)).strip().replace("^", "").replace("$", "")
   print(emoji + " " + s)
   return s
+
+
+def is_sequence_legit(tokenizer: Tokenizer, toks: mx.array) -> bool:
+  tokens: list[int] = toks.tolist()
+
+  # Any invalid tokens in the sequence?
+  invalid_toks = [tokenizer.pad_idx, tokenizer.mask_idx, tokenizer.unk_idx]
+  if any(invalid_tok in tokens for invalid_tok in invalid_toks):
+    return False
+
+  # Does the sequence start and end with the correct tokens?
+  if tokens[0] != tokenizer.cls_idx or tokens[-1] != tokenizer.eos_idx:
+    return False
+
+  # Are only protein tokens in middle of the sequence?
+  protein_toks = tokenizer.protein_toks
+  return all(tok in protein_toks for tok in tokens[1:-1])

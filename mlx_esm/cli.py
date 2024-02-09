@@ -1,6 +1,7 @@
 from datetime import datetime
 from enum import Enum
 from os import path
+from typing import Optional
 
 import click
 
@@ -76,22 +77,37 @@ def unmask_cmd(model: str, weights_file: str, input: str) -> None:
 @click.option(
   "--weights-dir",
   type=click.Path(exists=True, dir_okay=True, file_okay=False),
-  required=True,
 )
-def train_cmd(model: str, weights_dir: str) -> None:
+@click.option(
+  "--weights-file",
+  type=click.Path(exists=True, dir_okay=False, file_okay=True),
+)
+def train_cmd(model: str, weights_dir: Optional[str], weights_file: Optional[str]) -> None:
   """
-  Train a model and save the weights to a file.
+  Train a new/existing model and save/updates the weights in a file.
   """
+  if (weights_dir and weights_file) or (not weights_dir and not weights_file):
+    raise click.BadParameter("You must provide exactly one of --weights-dir and --weights-file.")
+
   m = get_model(model)
+  if weights_file:
+    m.load_weights(weights_file)
 
   c = Config()
   t = Trainer(m, c)
   t.load()
   t.run()
 
-  now = datetime.now()
-  time_str = now.strftime("%Y%m%d%H%M")
-  file_path = path.join(f"{weights_dir}/{model}-${time_str}.npz")
+  if weights_file:
+    file_path = weights_file
+    # Clear the file
+    with open(file_path, "w"):
+      pass
+  else:
+    now = datetime.now()
+    time_str = now.strftime("%Y%m%d%H%M")
+    file_path = path.join(f"{weights_dir}/{model}-{time_str}.npz")
+
   m.save_weights(file_path)
 
   print(f"💾 model weights saved to {file_path}")

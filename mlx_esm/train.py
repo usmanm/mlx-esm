@@ -166,8 +166,9 @@ class Trainer(object):
     duration = now - self.last_log_time
     self.last_log_time = now
 
+    # Compute the average loss over the last batch sized window.
     losses = self.losses[-bucket_size:]
-    avg_loss = sum(losses) / len(losses)
+    avg_loss = round(sum(losses) / len(losses), 4)
 
     print(f"🚂 iter={self.iter_num} duration={round(duration, 1)} loss={avg_loss}")
 
