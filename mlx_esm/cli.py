@@ -58,15 +58,19 @@ def generate_cmd(model: str, weights_file: str, length: Optional[int] = None) ->
   type=click.Path(exists=True, dir_okay=False, file_okay=True, readable=True),
   required=True,
 )
-@click.argument("input")
-def unmask_cmd(model: str, weights_file: str, input: str) -> None:
+@click.option(
+  "--seq",
+  type=str,
+  required=True,
+)
+def unmask_cmd(model: str, weights_file: str, seq: str) -> None:
   """
   Unmask a masked protein sequence.
   """
   m = get_model(model)
   m.load_weights(weights_file)
 
-  unmask(m, input)
+  unmask(m, seq)
 
 
 @click.command("train")

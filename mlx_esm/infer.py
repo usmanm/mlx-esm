@@ -5,7 +5,7 @@ from mlx_esm.data import Tokenizer
 from mlx_esm.model import Base
 
 
-def generate(model: Base, length: int = 32, max_iters: int = 100) -> str:
+def generate(model: Base, length: int = 32, max_iters: int = 256) -> str:
   # And then god said, let there be more proteins.
   mask_len = min(model.context_size - 1, length)
 
@@ -14,7 +14,7 @@ def generate(model: Base, length: int = 32, max_iters: int = 100) -> str:
   return impl(model, start_seq, max_iters)
 
 
-def unmask(model: Base, masked_seq: str, max_iters: int = 100) -> str:
+def unmask(model: Base, masked_seq: str, max_iters: int = 256) -> str:
   if len(masked_seq) > model.max_seq_len:
     raise ValueError("sequence exceeds context size")
   return impl(model, f"^{masked_seq}$", max_iters)
@@ -30,29 +30,30 @@ def impl(model: Base, input: str, max_iters: int) -> str:
   mx.eval(model.parameters())
 
   iter_num = 0
-  toks = tokenizer.encode(input)
-  x = mx.array([mx.array(toks)], dtype=mx.int32)
+  toks = tokenizer.encode(input).tolist()
+  toks = mx.array(toks + [tokenizer.pad_idx] * (model.context_size - len(toks)))
+  x = mx.array([toks], dtype=mx.int32)
 
   print_sequence(tokenizer, toks, "🌱")
 
   while iter_num < max_iters:
     toks = x[0]
 
-    iter_num += 1
     if is_sequence_legit(tokenizer, toks):
       break
 
     # forward the model
     logits = model(x)
-    x = logits_to_next_x(logits)
+    x = compute_next_x(tokenizer, x, logits)
     if iter_num > 0:
       print_sequence(tokenizer, toks, "🕐")
+    iter_num += 1
 
   emoji = "🌳" if is_sequence_legit(tokenizer, toks) else "🍂"
   return print_sequence(tokenizer, toks, emoji)
 
 
-def logits_to_next_x(logits: mx.array) -> mx.array:
+def compute_next_x(tokenizer: Tokenizer, x: mx.array, logits: mx.array) -> mx.array:
   probs = np.array(mx.softmax(logits, axis=-1))
 
   # This is equivalent to multinomial in PyTorch.
@@ -62,13 +63,24 @@ def logits_to_next_x(logits: mx.array) -> mx.array:
       for prob in probs.reshape(-1, probs.shape[-1])
     ]
   )
-  sample = samples.reshape(probs.shape[0], probs.shape[1])
+  sample = mx.array(samples.reshape(probs.shape[0], probs.shape[1]))
 
-  return mx.array(sample)
+  # We only swap out the first mask token to turn this into an
+  # autoregressive model. My theory is that this will lead to
+  # more realistic sequences because the model sees it grow rather
+  # than guessing the entire sequence in a single shot.
+  mask_all = x == tokenizer.mask_idx
+  mask_first = mx.zeros_like(mask_all)
+  mask_first[mx.arange(mask_all.shape[0]), mask_all.argmax(axis=1)] = 1
+
+  sample = sample * mask_first
+  x = x * (1 - mask_first)
+
+  return x + sample
 
 
 def print_sequence(tokenizer: Tokenizer, toks: mx.array, emoji: str) -> str:
-  s = "".join(tokenizer.decode(toks)).strip()
+  s = "".join(tokenizer.decode(toks)).strip().rstrip("%").rstrip("$").lstrip("^")
   print(emoji + " " + s)
   return s
 
@@ -77,14 +89,18 @@ def is_sequence_legit(tokenizer: Tokenizer, toks: mx.array) -> bool:
   tokens: list[int] = toks.tolist()
 
   # Any invalid tokens in the sequence?
-  invalid_toks = [tokenizer.pad_idx, tokenizer.mask_idx, tokenizer.unk_idx]
+  invalid_toks = [tokenizer.mask_idx, tokenizer.unk_idx]
   if any(invalid_tok in tokens for invalid_tok in invalid_toks):
     return False
+
+  # Remove any padding
+  while tokens and tokens[-1] == tokenizer.pad_idx:
+    tokens.pop()
 
   # Does the sequence start and end with the correct tokens?
   if tokens[0] != tokenizer.cls_idx or tokens[-1] != tokenizer.eos_idx:
     return False
 
   # Are only protein tokens in middle of the sequence?
-  protein_toks = tokenizer.protein_toks
+  protein_toks: list[int] = tokenizer.encode("".join(tokenizer.protein_toks)).tolist()
   return all(tok in protein_toks for tok in tokens[1:-1])
