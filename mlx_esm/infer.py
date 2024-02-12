@@ -29,26 +29,24 @@ def impl(model: Base, input: str, max_iters: int) -> str:
   model.eval()
   mx.eval(model.parameters())
 
-  iter_num = 0
   toks = tokenizer.encode(input).tolist()
   toks = mx.array(toks + [tokenizer.pad_idx] * (model.context_size - len(toks)))
   x = mx.array([toks], dtype=mx.int32)
 
   print_sequence(tokenizer, toks, "🌱")
 
-  while iter_num < max_iters:
+  for i in range(max_iters):
     toks = x[0]
 
     if is_sequence_legit(tokenizer, toks):
       break
 
-    if iter_num > 0:
+    if i > 0:
       print_sequence(tokenizer, toks, "🕐")
 
     # forward the model
     logits = model(x)
     x = compute_next_x(tokenizer, x, logits)
-    iter_num += 1
 
   emoji = "🌳" if is_sequence_legit(tokenizer, toks) else "🍂"
   return print_sequence(tokenizer, toks, emoji)
