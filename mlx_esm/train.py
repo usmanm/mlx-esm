@@ -128,8 +128,8 @@ class Trainer(object):
     model.train()
     mx.eval(model.parameters())
 
-    def loss_fn(model: Base, x: mx.array, y: mx.array) -> mx.array:
-      return model.loss(model(x), y)
+    def loss_fn(model: Base, x: mx.array, targets: mx.array) -> mx.array:
+      return mx.mean(nn.losses.cross_entropy(model(x), targets))
 
     loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
     optimizer = optim.SGD(learning_rate=config.learning_rate)

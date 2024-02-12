@@ -5,14 +5,12 @@ import mlx.nn as nn
 class Base(nn.Module):
   def __init__(self, content_size: int):
     super(Base, self).__init__()
+
     self.context_size = content_size
     self.max_seq_len = content_size - 2
 
   def __call__(self, _: mx.array) -> mx.array:
     raise NotImplementedError
-
-  def loss(self, logits: mx.array, targets: mx.array) -> mx.array:
-    return mx.mean(nn.losses.cross_entropy(logits, targets))
 
 
 class Embedding(nn.Module):
