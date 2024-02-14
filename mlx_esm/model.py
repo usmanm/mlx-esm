@@ -293,9 +293,7 @@ class ESM1(Base):
       pad_idx=self.pad_idx,
       scale=math.sqrt(self.embed_dims),
     )
-    # TODO: debug why this is not working
     self.embed_positions = SinusoidalPositionalEmbedding(self.embed_dims, self.pad_idx)
-    # self.embed_positions = nn.SinusoidalPositionalEncoding(self.embed_dims)
 
     self.transformer_layers = nn.Sequential(
       *[
