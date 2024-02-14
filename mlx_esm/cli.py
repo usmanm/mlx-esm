@@ -5,6 +5,7 @@ from typing import Optional
 
 import click
 
+from mlx_esm.data import Tokenizer
 from mlx_esm.infer import generate, unmask
 from mlx_esm.model import ESM1, MLP, Base
 from mlx_esm.train import Config, Trainer
@@ -16,11 +17,12 @@ class ModelName(Enum):
 
 
 def get_model(name: str) -> Base:
-  v = ModelName[name.upper()]
-  if v == ModelName.MLP:
-    return MLP()
-  elif v == ModelName.ESM1:
-    return ESM1()
+  enum = ModelName[name.upper()]
+  t = Tokenizer()
+  if enum == ModelName.MLP:
+    return MLP(t)
+  elif enum == ModelName.ESM1:
+    return ESM1(t)
   else:
     raise KeyError(f"unknown model name: {name}")
 

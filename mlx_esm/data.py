@@ -114,6 +114,14 @@ class Tokenizer(object):
       "Z",
     )
     self.all_toks: list[str] = sorted(list(self.special_toks) + list(self.protein_toks))
+
+    # Make padding_idx always be 0. This allows us to keep positional embeddings simple.
+    tmp_idx = self.all_toks.index("%")
+    zero_val = self.all_toks[0]
+    self.all_toks[0] = "%"
+    self.all_toks[tmp_idx] = zero_val
+
+    assert self.all_toks[0] == "%"
     assert len(self.all_toks) == len(set(self.all_toks))
 
     self.idx_to_tok = dict(enumerate(self.all_toks))
@@ -125,6 +133,8 @@ class Tokenizer(object):
     self.cls_idx = self.tok_to_idx["^"]
     self.mask_idx = self.tok_to_idx["*"]
     self.eos_idx = self.tok_to_idx["$"]
+
+    assert self.pad_idx == 0
 
   def tokenize(self, sequence: str) -> list[str]:
     # Example:

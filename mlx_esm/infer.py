@@ -29,25 +29,24 @@ def impl(model: Base, input: str, max_iters: int) -> str:
   model.eval()
   mx.eval(model.parameters())
 
-  iter_num = 0
   toks = tokenizer.encode(input).tolist()
   toks = mx.array(toks + [tokenizer.pad_idx] * (model.context_size - len(toks)))
   x = mx.array([toks], dtype=mx.int32)
 
   print_sequence(tokenizer, toks, "🌱")
 
-  while iter_num < max_iters:
+  for i in range(max_iters):
     toks = x[0]
 
     if is_sequence_legit(tokenizer, toks):
       break
 
+    if i > 0:
+      print_sequence(tokenizer, toks, "🕐")
+
     # forward the model
     logits = model(x)
     x = compute_next_x(tokenizer, x, logits)
-    if iter_num > 0:
-      print_sequence(tokenizer, toks, "🕐")
-    iter_num += 1
 
   emoji = "🌳" if is_sequence_legit(tokenizer, toks) else "🍂"
   return print_sequence(tokenizer, toks, emoji)
@@ -65,8 +64,8 @@ def compute_next_x(tokenizer: Tokenizer, x: mx.array, logits: mx.array) -> mx.ar
   )
   sample = mx.array(samples.reshape(probs.shape[0], probs.shape[1]))
 
-  # We only swap out the first mask token to turn this into an
-  # autoregressive model. My theory is that this will lead to
+  # We only swap out the first mask token to generate proetins using
+  # an autoregressive style. My theory is that this will lead to
   # more realistic sequences because the model sees it grow rather
   # than guessing the entire sequence in a single shot.
   mask_all = x == tokenizer.mask_idx

@@ -7,3 +7,6 @@ format:
 
 vscode:
     poetry run code .
+
+notebook:
+    poetry run jupyter lab
