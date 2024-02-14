@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Optional, Union
 
 import mlx.core as mx
 import mlx.nn as nn
@@ -7,9 +7,22 @@ import mlx.nn as nn
 from mlx_esm.data import Tokenizer
 
 
+def count_parameters(params: Union[list, dict]) -> int:
+  if isinstance(params, mx.array):
+    return params.size
+  if isinstance(params, list):
+    return sum([count_parameters(p) for p in params])
+  if isinstance(params, dict):
+    return sum([count_parameters(p) for p in params.values()])
+  raise ValueError(f"unknown module type: {type(params)}")
+
+
 class Base(nn.Module):
   def __call__(self, _: mx.array) -> mx.array:
     raise NotImplementedError
+
+  def num_parameters(self):
+    return count_parameters(self.parameters())
 
 
 class Embedding(nn.Module):
@@ -109,57 +122,43 @@ class MLP(Base):
 #
 # For a deep dive into position encodings, see:
 # https://kazemnejad.com/blog/transformer_architecture_positional_encoding/
+# https://github.com/facebookresearch/esm/blob/main/esm/modules.py#L260
 class SinusoidalPositionalEmbedding(nn.Module):
-  def __init__(
-    self,
-    embed_dims: int,
-    pad_idx: int,
-    scale: Optional[float] = None,
-  ):
+  def __init__(self, embed_dims: int, pad_idx: int):
     super(SinusoidalPositionalEmbedding, self).__init__()
+    assert embed_dims % 2 == 0, "embed_dims must be even"
 
     self.embed_dims = embed_dims
     self.pad_idx = pad_idx
+    self._embeddings = None
 
-    half_dim = embed_dims // 2
-    self.one_zero = 1 - mx.arange(0, half_dim) / (half_dim - 1)
-    self.scale = scale or math.sqrt(2 / embed_dims)
-
-    # Start with underscore so it is not included in the parameters
-    self._embed = None
-
-  def embed(self, max_pos: int):
-    if self._embed is None or max_pos > self._embed.shape[0]:
-      embed_dim = self.embed_dims
-      half_dim = embed_dim // 2
-
+  def embeddings(self, max_pos: int):
+    if self._embeddings is None or max_pos > self._embeddings.shape[0]:
       # Creates a series of values that represent the frequencies W_k for the sinusoidal functions
       # where each subsequent frequency is an exponential step smaller than the previous one. We
       # represent this as a row vector of size half_dim.
-      log_frequencies = math.log(10000) / (half_dim - 1)
-      rates = mx.exp(mx.arange(half_dim, dtype=mx.float32) * -log_frequencies).reshape(1, -1)
+      half_dim = self.embed_dims // 2
+      freqs = mx.exp(mx.arange(half_dim, dtype=mx.float32) * -(math.log(10000) / (half_dim - 1)))
 
       # Create a 2-D column-vector representing the position indices of shape (max_pos, 1)
-      positions = mx.arange(max_pos, dtype=mx.float32).reshape(-1, 1)
+      positions = mx.arange(max_pos, dtype=mx.float32)[..., None]
 
       # Create a 2-D matrix of shape (max_pos, half_dim).
-      scaled_positions = positions * rates
+      args = positions * freqs[None, ...]
 
       # Create a final 2-D matrix of shape (max_pos, embed_dim) by concatenating the
       # sin and cos of the scaled positions.
-      embed = mx.concatenate([mx.sin(scaled_positions), mx.cos(scaled_positions)], axis=1)
-      embed = embed.reshape(max_pos, -1) * self.scale
+      embedding = mx.concatenate([mx.sin(args), mx.cos(args)], axis=-1)
 
       # No impact of padding token.
-      embed[0, :] = 0
+      embedding[0, :] = 0
 
-      self._embed = embed
+      self._embeddings = embedding
 
-    return self._embed
+    return self._embeddings
 
   def positions(self, x: mx.array) -> mx.array:
     mask = x != self.pad_idx
-
     # We add 1 because postition 0 is reserved for the padding token.
     positions = mx.ones(x.shape, dtype=mx.int32) * (mx.arange(x.shape[1], dtype=mx.int32) + 1)
     return positions * mask
@@ -168,12 +167,12 @@ class SinusoidalPositionalEmbedding(nn.Module):
     seq_len = x.shape[1]
     max_pos = seq_len + 1
 
-    # (L+1 X C)
-    emb = self.embed(max_pos)[:max_pos, :]
-    # (B x L)
+    # (>=L, C)
+    emb = self.embeddings(max_pos)[:max_pos, :]
+    # (B, L)
     pos = self.positions(x)
 
-    # (B x L x C)
+    # (B, L, C)
     y = emb[pos]
 
     return y
@@ -185,6 +184,7 @@ class SinusoidalPositionalEmbedding(nn.Module):
     return f"SinusoidalPositionalEmbedding({args})"
 
 
+# https://github.com/facebookresearch/esm/blob/main/esm/modules.py#L44
 class LayerNorm(nn.Module):
   def __init__(self, embed_dims: int, eps=1e-12):
     """
@@ -197,10 +197,10 @@ class LayerNorm(nn.Module):
     self.bias = mx.zeros(embed_dims)
 
   def __call__(self, x: mx.array) -> mx.array:
-    mean = x.mean(-1, keepdims=True)
-    var = x.var(-1, keepdims=True)
+    means = x.mean(-1, keepdims=True)
+    variances = x.var(-1, keepdims=True)
 
-    v = (x - mean) / mx.sqrt(var + self.eps)
+    v = (x - means) / mx.sqrt(variances + self.eps)
     return (self.weight * v) + self.bias
 
 
@@ -211,6 +211,7 @@ class LayerNorm(nn.Module):
 # For an in-depth look at the Transformer architecture, see:
 # https://nlp.seas.harvard.edu/annotated-transformer/
 # https://jalammar.github.io/illustrated-transformer/
+# https://github.com/facebookresearch/esm/blob/main/esm/modules.py#L84
 class TransformerLayer(nn.Module):
   def __init__(
     self,
@@ -275,6 +276,7 @@ class ESM1(Base):
     super(ESM1, self).__init__()
 
     self.tokenizer = tokenizer
+    self.pad_idx = tokenizer.pad_idx
     self.num_layers = num_layers
     self.embed_dims = embed_dims
     self.ffn_embed_dims = ffn_embed_dims
@@ -288,9 +290,12 @@ class ESM1(Base):
     self.embed_tokens = Embedding(
       self.vocab_size,
       self.embed_dims,
-      pad_idx=self.tokenizer.pad_idx,
+      pad_idx=self.pad_idx,
+      scale=math.sqrt(self.embed_dims),
     )
-    self.embed_positions = SinusoidalPositionalEmbedding(self.embed_dims, self.tokenizer.pad_idx)
+    # TODO: debug why this is not working
+    self.embed_positions = SinusoidalPositionalEmbedding(self.embed_dims, self.pad_idx)
+    # self.embed_positions = nn.SinusoidalPositionalEncoding(self.embed_dims)
 
     self.transformer_layers = nn.Sequential(
       *[

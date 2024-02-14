@@ -21,9 +21,9 @@ def set_seed(seed):
 class Config(object):
   seed: int = 42
   dbs: list[int] = field(default_factory=lambda: [1])
-  max_iters: int = 1
-  batch_size: int = 1
-  learning_rate: float = 0.1
+  max_iters: int = 100_000
+  batch_size: int = 16
+  learning_rate: float = 0.01
   mask_rate: float = 0.15
   context_size = 64
 
