@@ -8,7 +8,7 @@ import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
 
-from mlx_esm.data import BatchTokenizer, load_uniparc_dbs
+from mlx_esm.data import BatchTokenizer, Tokenizer, load_uniparc_dbs
 from mlx_esm.model import MLP, Base
 
 
@@ -21,11 +21,11 @@ def set_seed(seed):
 class Config(object):
   seed: int = 42
   dbs: list[int] = field(default_factory=lambda: [1])
-  max_iters: int = 100_000
-  batch_size: int = 16
+  max_iters: int = 1
+  batch_size: int = 1
   learning_rate: float = 0.1
   mask_rate: float = 0.15
-  context_size = 128
+  context_size = 64
 
 
 class TrainingLoader(object):
@@ -57,8 +57,9 @@ class TrainingLoader(object):
       data = sorted(data, key=lambda s: len(s))
     self.data = data
 
-  def vocab_size(self) -> int:
-    return self.batch_tokenizer.tokenizer.vocab_size
+  @property
+  def tokenizer(self) -> Tokenizer:
+    return self.batch_tokenizer.tokenizer
 
   def next_batch(self) -> Tuple[mx.array, mx.array]:
     if self.data is None:
@@ -108,8 +109,8 @@ class Trainer(object):
       False,
     )
     self.model = model or MLP(
+      tokenzier=self.loader.tokenizer,
       context_size=config.context_size,
-      vocab_size=self.loader.vocab_size(),
     )
 
     # variables that will be assigned to trainer class later for logging and etc
@@ -159,7 +160,7 @@ class Trainer(object):
     self.iter_num += 1
     self.losses.append(loss)
 
-    if self.iter_num == 0 or self.iter_num % 1000 != 0:
+    if self.iter_num == 0 or self.iter_num % bucket_size != 0:
       return
 
     now = time.time()
