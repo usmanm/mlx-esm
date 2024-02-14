@@ -203,6 +203,33 @@ class LayerNorm(nn.Module):
     v = (x - means) / mx.sqrt(variances + self.eps)
     return (self.weight * v) + self.bias
 
+  def __repr__(self):
+    return f"LayerNorm(embed_dims={self.embed_dims})"
+
+
+class MultiHeadAttention(nn.Module):
+  def __init__(self, embed_dims: int, num_heads: int, bias: bool = True):
+    super(MultiHeadAttention, self).__init__()
+
+    self.embed_dims = embed_dims
+    self.num_heads = num_heads
+    self.bias = bias
+
+    self.impl = nn.MultiHeadAttention(
+      self.embed_dims,
+      self.num_attn_heads,
+      bias=True,
+    )
+
+  def __call__(self, x: mx.array) -> mx.array:
+    return self.impl(x, x, x)
+
+  def __repr__(self):
+    args = f"embed_dims={self.embed_dims}, "
+    args += f"num_heads={self.num_heads}, "
+    args += f"bias={self.bias}"
+    return f"MultiHeadAttention({args})"
+
 
 # The Transformer architecture is the driver of this latest wave of AI.
 # It simple architecture makes it easy to parallelize and train on GPUs,
