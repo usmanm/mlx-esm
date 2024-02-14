@@ -208,21 +208,59 @@ class LayerNorm(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-  def __init__(self, embed_dims: int, num_heads: int, bias: bool = True):
+  def __init__(self, embed_dims: int, num_heads: int, bias: bool = True, add_bias_kv: bool = True):
     super(MultiHeadAttention, self).__init__()
+
+    assert embed_dims % num_heads == 0, "embed_dims must be divisible by num_heads"
 
     self.embed_dims = embed_dims
     self.num_heads = num_heads
     self.bias = bias
 
-    self.impl = nn.MultiHeadAttention(
-      self.embed_dims,
-      self.num_attn_heads,
-      bias=True,
-    )
+    # TODO: implement adding bias to the key and value projections
+    self.add_bias_kv = add_bias_kv
 
-  def __call__(self, x: mx.array) -> mx.array:
-    return self.impl(x, x, x)
+    # We use the same dimensions for queries, keys & values.
+    qdims = embed_dims
+    kdims = embed_dims
+    vdims = embed_dims
+
+    self.k_proj = nn.Linear(kdims, embed_dims, bias=bias)
+    self.v_proj = nn.Linear(vdims, embed_dims, bias=bias)
+    self.q_proj = nn.Linear(qdims, embed_dims, bias=bias)
+    self.out_proj = nn.Linear(embed_dims, embed_dims, bias=bias)
+
+  def __call__(self, queries: mx.array, keys: mx.array, values: mx.array) -> mx.array:
+    H = self.num_heads
+
+    queries = self.q_proj(queries)
+    B, L, C = queries.shape
+    assert self.embed_dims == C, "queries has incorrect embed_dims"
+
+    scale = math.sqrt(1.0 / C)
+    queries = queries * scale
+
+    keys = self.k_proj(keys)
+    values = self.v_proj(values)
+
+    _, S, _ = keys.shape
+    K = C // H
+    assert K * H == C, "embed_dims must be divisible by num_heads"
+
+    # Reshape the queries, keys, and values so we can compute the attention
+    # on all heads in parallel.
+    queries = queries.reshape(B, L, H, K).transpose([0, 2, 1, 3])  # (B, H, L, K)
+    keys = keys.reshape(B, S, H, K).transpose([0, 2, 3, 1])  # (B, H, K, S)
+    values = values.reshape(B, S, H, K).transpose([0, 2, 1, 3])  # (B, H, S, K)
+
+    scores = queries @ keys  # (B, H, L, S)
+    scores = nn.softmax(scores, axis=-1)
+
+    values_hat = scores @ values  # (B, H, L, K)
+    values_hat = values_hat.transpose([0, 2, 1, 3])  # (B, L, H, K)
+    values_hat = values_hat.reshape(B, L, C)  # (B, L, C)
+
+    return self.out_proj(values_hat)
 
   def __repr__(self):
     args = f"embed_dims={self.embed_dims}, "
