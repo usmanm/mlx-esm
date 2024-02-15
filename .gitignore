@@ -160,5 +160,4 @@ cython_debug/
 #.idea/
 
 data/
-weights/
 notebooks/scratch.ipynb

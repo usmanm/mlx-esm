@@ -1,67 +1,87 @@
+import random
+from typing import Optional
+
 import mlx.core as mx
 import numpy as np
+from tqdm.auto import tqdm
 
 from mlx_esm.data import Tokenizer
-from mlx_esm.model import Base
+from mlx_esm.model import ESM1
 
 
-def generate(model: Base, length: int = 32, max_iters: int = 256) -> str:
-  # And then god said, let there be more proteins.
-  mask_len = min(model.context_size - 1, length)
+def generate(
+  model: ESM1,
+  length: Optional[int] = None,
+  max_iters: int = 256,
+  max_prob_only: bool = False,
+):
+  length = length or random.randint(32, 96)
 
-  pad_len = model.context_size - mask_len - 2
-  start_seq = "^" + "*" * min(model.context_size - 1, length) + "$" + "%" * pad_len
-  return impl(model, start_seq, max_iters)
-
-
-def unmask(model: Base, masked_seq: str, max_iters: int = 256) -> str:
-  if len(masked_seq) > model.max_seq_len:
-    raise ValueError("sequence exceeds context size")
-  return impl(model, f"^{masked_seq}$", max_iters)
+  start_seq = "^" + "*" * length + "$"
+  return impl(model, start_seq, max_iters, max_prob_only)
 
 
-def impl(model: Base, input: str, max_iters: int) -> str:
-  if len(input) > model.context_size:
-    raise ValueError("input exceeds context size")
+def unmask(
+  model: ESM1,
+  masked_seq: str,
+  max_iters: int = 256,
+  max_prob_only: bool = False,
+):
+  return impl(model, f"^{masked_seq}$", max_iters, max_prob_only)
 
+
+def impl(model: ESM1, input: str, max_iters: int, max_prob_only: bool):
   tokenizer = Tokenizer()
 
   model.eval()
   mx.eval(model.parameters())
 
-  toks = tokenizer.encode(input).tolist()
-  toks = mx.array(toks + [tokenizer.pad_idx] * (model.context_size - len(toks)))
+  toks = tokenizer.encode(input)
   x = mx.array([toks], dtype=mx.int32)
 
-  print_sequence(tokenizer, toks, "🌱")
-
-  for i in range(max_iters):
+  total = (toks == tokenizer.mask_idx).sum().item()
+  loop = tqdm(
+    total=total,
+    ncols=120,
+    desc="🌱 generating",
+  )
+  for _ in range(max_iters):
     toks = x[0]
 
     if is_sequence_legit(tokenizer, toks):
       break
 
-    if i > 0:
-      print_sequence(tokenizer, toks, "🕐")
-
     # forward the model
     logits = model(x)
-    x = compute_next_x(tokenizer, x, logits)
+    x = compute_next_x(tokenizer, x, logits, max_prob_only)
+    loop.update()
+
+  loop.close()
 
   emoji = "🌳" if is_sequence_legit(tokenizer, toks) else "🍂"
-  return print_sequence(tokenizer, toks, emoji)
+  s = "".join(tokenizer.decode(toks)).strip().rstrip("%").rstrip("$").lstrip("^")
+  print(emoji + " hello world: " + s)
 
 
-def compute_next_x(tokenizer: Tokenizer, x: mx.array, logits: mx.array) -> mx.array:
+def compute_next_x(
+  tokenizer: Tokenizer,
+  x: mx.array,
+  logits: mx.array,
+  max_prob_only: bool = False,
+) -> mx.array:
   probs = np.array(mx.softmax(logits, axis=-1))
 
   # This is equivalent to multinomial in PyTorch.
-  samples = np.array(
-    [
-      np.random.choice(range(probs.shape[-1]), p=prob)
-      for prob in probs.reshape(-1, probs.shape[-1])
-    ]
-  )
+  if max_prob_only:
+    samples = np.array([np.argmax(prob) for prob in probs.reshape(-1, probs.shape[-1])])
+  else:
+    samples = np.array(
+      [
+        np.random.choice(range(probs.shape[-1]), p=prob)
+        for prob in probs.reshape(-1, probs.shape[-1])
+      ]
+    )
+
   sample = mx.array(samples.reshape(probs.shape[0], probs.shape[1]))
 
   # We only swap out the first mask token to generate proetins using
@@ -76,12 +96,6 @@ def compute_next_x(tokenizer: Tokenizer, x: mx.array, logits: mx.array) -> mx.ar
   x = x * (1 - mask_first)
 
   return x + sample
-
-
-def print_sequence(tokenizer: Tokenizer, toks: mx.array, emoji: str) -> str:
-  s = "".join(tokenizer.decode(toks)).strip().rstrip("%").rstrip("$").lstrip("^")
-  print(emoji + " " + s)
-  return s
 
 
 def is_sequence_legit(tokenizer: Tokenizer, toks: mx.array) -> bool:

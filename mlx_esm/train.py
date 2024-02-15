@@ -1,181 +1,138 @@
 import random
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Tuple
+from functools import partial
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import mlx.core as mx
 import mlx.nn as nn
 import mlx.optimizers as optim
+from tqdm.auto import tqdm
 
-from mlx_esm.data import BatchTokenizer, Tokenizer, load_uniparc_dbs
-from mlx_esm.model import MLP, Base
+from mlx_esm.data import DataSplit, Loader
+from mlx_esm.model import ESM1
+from mlx_esm.tokenizer import Tokenizer
 
 
-def set_seed(seed):
+def set_seed(seed: int):
   random.seed(seed)
   mx.random.seed(seed)
 
 
 @dataclass
 class Config(object):
+  # The answer to the ultimate question of life, the universe, and everything.
   seed: int = 42
-  dbs: list[int] = field(default_factory=lambda: [1])
+
+  dbs: list[int] = field(default_factory=lambda: [1, 2, 3])
   max_iters: int = 100_000
   batch_size: int = 16
   learning_rate: float = 0.01
   mask_rate: float = 0.15
-  context_size = 64
 
-
-class TrainingLoader(object):
-  def __init__(
-    self,
-    dbs: list[int],
-    batch_size: int,
-    context_size: int,
-    mask_rate: float,
-    dynamic_padding: bool,
-  ):
-    self.dbs = sorted(dbs)
-    self.batch_size = batch_size
-    self.context_size = context_size
-    self.mask_rate = mask_rate
-    self.batch_tokenizer = BatchTokenizer(
-      context_size=context_size,
-      dynamic_padding=dynamic_padding,
-    )
-    self.data: Optional[list[str]] = None
-    self.dynamic_padding = dynamic_padding
-
-  def load(self):
-    sequences = load_uniparc_dbs(self.dbs)
-    # We filter out sequences that are too long to fit in the context size.
-    # Subtracting 2 from the context size to account for the CLS and EOS tokens.
-    data = [s for s in sequences if len(s) <= self.context_size - 2]
-    if self.dynamic_padding:
-      data = sorted(data, key=lambda s: len(s))
-    self.data = data
-
-  @property
-  def tokenizer(self) -> Tokenizer:
-    return self.batch_tokenizer.tokenizer
-
-  def next_batch(self) -> Tuple[mx.array, mx.array]:
-    if self.data is None:
-      raise Exception("data has not been loaded yet")
-
-    batch: list[str] = random.sample(self.data, self.batch_size)
-
-    encoded = self.batch_tokenizer.encode(batch)
-    shape: list[int] = list(encoded.shape)
-
-    tokenizer = self.batch_tokenizer.tokenizer
-    pad_idx, mask_idx = tokenizer.pad_idx, tokenizer.mask_idx
-
-    # We should not mask padding tokens because they do not form part of the
-    # underlying protein sequence. We do include CLS & EOS tokens because they
-    # are part of the sequence in so far that they do inform us about the structure
-    # of the protein.
-    #
-    # TODO: should we mask CLS and EOS tokens?
-    can_mask = encoded != pad_idx
-
-    # We should mask tokens with a probability of `mask_rate`. We will use a
-    # uniform distribution to determine which tokens to mask. By multiplying
-    # the result of the uniform distribution by `can_mask`, we ensure that we
-    # do not mask tokens that are padding tokens.
-    should_mask = (mx.random.uniform(0, 1, shape, dtype=mx.float32) < self.mask_rate) * can_mask
-    should_not_mask = 1 - should_mask
-
-    # BERT differs from ESM-1 in how it does masking. In ESM-1, we mask tokens
-    # with the mask token only, while in BERT the masking strategy is a bit more
-    # complex. We will implement the ESM-1 masking strategy here.
-    masked = (encoded * should_not_mask) + (should_mask * mask_idx)
-
-    return (masked, encoded)
+  # The maximum sequence length for proteins to train on. This effectively
+  # limits the "context size" of the model. Larger contexts are slower to
+  # train on my GPU-poor MacBook Air.
+  max_seq_len: int = 126
 
 
 class Trainer(object):
-  def __init__(self, model: Optional[Base] = None, config: Optional[Config] = None):
-    config = config or Config()
+  def __init__(self, model: Optional[ESM1] = None, config: Optional[Config] = None):
+    self.config = config or Config()
+    self.model = model or ESM1(Tokenizer())
 
-    self.config = config
-    self.loader = TrainingLoader(
-      config.dbs,
-      config.batch_size,
-      config.context_size,
-      config.mask_rate,
-      False,
-    )
-    self.model = model or MLP(
-      tokenzier=self.loader.tokenizer,
-      context_size=config.context_size,
+    self.loader = Loader(
+      self.model.tokenizer,
+      self.config.dbs,
+      self.config.batch_size,
+      self.config.max_seq_len,
+      self.config.mask_rate,
     )
 
-    # variables that will be assigned to trainer class later for logging and etc
-    self.iter_num = 0
-    self.last_log_time = 0.0
-    self.losses: list[float] = []
+    self.losses: dict[DataSplit, list[float]] = {
+      "train": [],
+      "validate": [],
+    }
+
+    set_seed(self.config.seed)
 
   def load(self):
+    print("📥 loading data")
     self.loader.load()
 
-  def run(self, max_iters: Optional[int] = None):
+  def train(self, max_iters: Optional[int] = None):
+    return self.run("train", max_iters or self.config.max_iters)
+
+  def validate(self, max_iters: Optional[int] = None):
+    return self.run("train", max_iters or int(self.config.max_iters * 0.1))
+
+  def run(self, split: DataSplit, max_iters: int):
     model = self.model
     config = self.config
     loader = self.loader
 
-    model.train()
+    if split == "train":
+      model.train()
+      desc = "🚂 training"
+    else:
+      model.eval()
+      desc = "🔍 validating"
+
     mx.eval(model.parameters())
 
-    def loss_fn(model: Base, x: mx.array, targets: mx.array) -> mx.array:
+    def loss_fn(model: ESM1, x: mx.array, targets: mx.array) -> mx.array:
       return mx.mean(nn.losses.cross_entropy(model(x), targets))
 
-    loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
-    optimizer = optim.SGD(learning_rate=config.learning_rate)
+    optimizer = optim.SGD(learning_rate=config.learning_rate, momentum=0.8)
 
-    set_seed(config.seed)
+    # https://ml-explore.github.io/mlx/build/html/usage/compile.html#compiling-training-graphs
+    state = [model.state, optimizer.state]
 
-    self.iter_num = 0
-    self.last_log_time = time.time()
-
-    while self.iter_num < (max_iters or config.max_iters):
-      x, y = loader.next_batch()
-
+    @partial(mx.compile, inputs=state, outputs=state)
+    def step(x: mx.array, y: mx.array):
       # forward the model
+      loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
       loss, grads = loss_and_grad_fn(model, x, y)
 
       # backprop and update the parameters
       # Update the optimizer state and model parameters
       # in a single call
-      optimizer.update(model, grads)
+      if split == "train":
+        optimizer.update(model, grads)
 
-      # Force a graph evaluation
-      mx.eval(model.parameters(), optimizer.state)
+      return loss
 
-      self.log_metrics(loss.item())
+    self.iter_num = 0
+    self.last_log_time = time.time()
 
-  def log_metrics(self, loss: float, bucket_size: int = 1000):
-    self.iter_num += 1
-    self.losses.append(loss)
+    loop = tqdm(
+      range(max_iters or config.max_iters),
+      ncols=120,
+      desc=desc,
+      postfix={"loss": "NaN"},
+    )
+    for _ in loop:
+      x, y = loader.next_batch("train")
+      loss = step(x, y)
+      mx.eval(state)
 
-    if self.iter_num == 0 or self.iter_num % bucket_size != 0:
-      return
+      avg_loss = self.avg_loss(split, loss.item())
+      loop.set_postfix({"loss": f"{avg_loss:.4f}"})
 
-    now = time.time()
-    duration = now - self.last_log_time
-    self.last_log_time = now
+  def avg_loss(self, split: DataSplit, loss: float, bucket_size: int = 1000):
+    losses = self.losses[split]
+    losses.append(loss)
 
-    # Compute the average loss over the last batch sized window.
-    losses = self.losses[-bucket_size:]
-    avg_loss = round(sum(losses) / len(losses), 4)
+    window = losses[-bucket_size:]
+    avg_loss = sum(window) / len(window)
+    return avg_loss
 
-    print(f"🚂 iter={self.iter_num} duration={round(duration, 1)} loss={avg_loss}")
+  def plot_loss(self, split: DataSplit, bucket_size: int = 1000):
+    losses = self.losses[split]
 
-  def plot_loss(self, bucket_size: int = 1000):
-    xs = range(self.iter_num)
-    ys = self.losses
+    xs = range(len(losses))
+    ys = losses
 
     # We will bucket the losses to make the plot more readable.
     bucketed_xs = range(0, len(xs), bucket_size)
@@ -185,6 +142,5 @@ class Trainer(object):
 
     plt.xlabel("iteration")
     plt.ylabel("loss")
-    plt.title("Training Loss")
     plt.plot(bucketed_xs, bucketed_ys)
     plt.show()
