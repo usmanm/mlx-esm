@@ -17,14 +17,6 @@ def count_parameters(params: Union[list, dict]) -> int:
   raise ValueError(f"unknown module type: {type(params)}")
 
 
-class Base(nn.Module):
-  def __call__(self, _: mx.array) -> mx.array:
-    raise NotImplementedError
-
-  def num_parameters(self):
-    return count_parameters(self.parameters())
-
-
 class Embedding(nn.Module):
   def __init__(
     self,
@@ -64,55 +56,6 @@ class Embedding(nn.Module):
     if self.pad_idx is not None:
       args += f", pad_idx={self.pad_idx}"
     return f"Embedding({args})"
-
-
-class EmbeddingConcat(nn.Module):
-  def __call__(self, x: mx.array) -> mx.array:
-    # (B x L x C) => (B x L*C)
-    return x.reshape(x.shape[0], -1)
-
-
-class MLP(Base):
-  # NB: This is a simple MLP model with a single hidden layers. Implementing this to
-  # make sure the training pipeline works.
-  def __init__(
-    self,
-    tokenzier: Tokenizer,
-    embed_dims: int = 16,
-    hidden_dims: int = 128,
-    context_size: int = 128,
-  ):
-    super(MLP, self).__init__()
-
-    self.tokenizer = tokenzier
-    self.context_size = context_size
-    self.max_seq_len = context_size - 2
-    self.embed_dims = embed_dims
-    self.vocab_size = tokenzier.vocab_size
-    self.hidden_dims = hidden_dims
-
-    output_size = tokenzier.vocab_size * context_size
-
-    self.layers = nn.Sequential(
-      # Embedding layer
-      Embedding(tokenzier.vocab_size, embed_dims, pad_idx=tokenzier.pad_idx),
-      EmbeddingConcat(),
-      # Hidden layer
-      nn.Linear(embed_dims * context_size, hidden_dims, bias=True),
-      nn.Tanh(),
-      # Output layer
-      nn.Linear(hidden_dims, output_size, bias=True),
-    )
-
-  def __call__(self, x: mx.array) -> mx.array:
-    x = self.layers(x)
-
-    # We are getting back B x (L * V) tensor, where B = batch size, L = context
-    # size, and V = vocab size. We need to reshape this tensor to B x L x V to
-    # get the logits.
-    logits = x.reshape(-1, self.context_size, self.vocab_size)
-
-    return logits
 
 
 # Transformers ditched recurrance in favor of self-attention. This helps with
@@ -270,8 +213,12 @@ class MultiHeadAttention(nn.Module):
 
 
 # The Transformer architecture is the driver of this latest wave of AI.
-# It simple architecture makes it easy to parallelize and train on GPUs,
-# which has unlocked the potential of large-scale language models.
+# Its simple architecture makes it easy to parallelize and train on GPUs,
+# a bit upgrade from the RNNs and LSTMs of the past. This has unlocked our
+# to train really large-scale language models, which have emergent properties
+# that are useful for a wide variety of tasks. Meta trained a large LM on
+# protein sequences, and with a few additional layers, it was able to achieve
+# state-of-the-art results on protein folding and contact prediction.
 #
 # For an in-depth look at the Transformer architecture, see:
 # https://nlp.seas.harvard.edu/annotated-transformer/
@@ -322,7 +269,7 @@ class TransformerLayer(nn.Module):
     return f"TransformerLayer({args})"
 
 
-class ESM1(Base):
+class ESM1(nn.Module):
   # These defaults have been scaled down here. The original defaults are:
   # num_layers: 33
   # embed_dims: 1280
@@ -333,8 +280,8 @@ class ESM1(Base):
     self,
     tokenizer: Tokenizer,
     num_layers: int = 4,
-    embed_dims: int = 128,
-    ffn_embed_dims: int = 512,
+    embed_dims: int = 64,
+    ffn_embed_dims: int = 256,
     num_attn_heads: int = 4,
     final_bias: bool = True,
   ):
@@ -381,14 +328,13 @@ class ESM1(Base):
     pos_embed = self.embed_positions(x)
     assert tok_embed.shape == pos_embed.shape
 
-    x = tok_embed + pos_embed
+    logits = tok_embed + pos_embed
+    logits = self.transformer_layers(logits)
+    logits = self.out(logits)
 
-    # (B, L, C) => (L, B, C)
-    x = x.transpose([1, 0, 2])
+    assert x.shape == logits.shape[:2] and logits.shape[2] == self.vocab_size
 
-    x = self.transformer_layers(x)
+    return logits
 
-    x = self.out(x)
-    x = x.transpose([1, 0, 2])  # (L, B, C) => (B, L, C)
-
-    return x
+  def num_parameters(self):
+    return count_parameters(self.parameters())

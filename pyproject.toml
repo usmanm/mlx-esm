@@ -10,7 +10,7 @@ cli = "mlx_esm.cli:main"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-mlx = "^0.1.0"
+mlx = "^0.2.0"
 requests = "^2.31.0"
 ruff = "^0.2.1"
 pyright = "^1.1.350"
@@ -19,6 +19,9 @@ ipython = "^8.21.0"
 matplotlib = "^3.8.2"
 numpy = "^1.26.4"
 click = "^8.1.7"
+tqdm = "^4.66.2"
+ipywidgets = "^8.1.2"
+py3dmol = "^2.0.4"
 
 [tool.poetry.group.dev.dependencies]
 torch = "^2.2.0"

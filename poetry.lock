@@ -846,6 +846,27 @@ test = ["pickleshare", "pytest (<8)", "pytest-asyncio (<0.22)", "testpath"]
 test-extra = ["curio", "matplotlib (!=3.2.0)", "nbformat", "numpy (>=1.23)", "pandas", "pickleshare", "pytest (<8)", "pytest-asyncio (<0.22)", "testpath", "trio"]
 
 [[package]]
+name = "ipywidgets"
+version = "8.1.2"
+description = "Jupyter interactive widgets"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "ipywidgets-8.1.2-py3-none-any.whl", hash = "sha256:bbe43850d79fb5e906b14801d6c01402857996864d1e5b6fa62dd2ee35559f60"},
+    {file = "ipywidgets-8.1.2.tar.gz", hash = "sha256:d0b9b41e49bae926a866e613a39b0f0097745d2b9f1f3dd406641b4a57ec42c9"},
+]
+
+[package.dependencies]
+comm = ">=0.1.3"
+ipython = ">=6.1.0"
+jupyterlab-widgets = ">=3.0.10,<3.1.0"
+traitlets = ">=4.3.1"
+widgetsnbextension = ">=4.0.10,<4.1.0"
+
+[package.extras]
+test = ["ipykernel", "jsonschema", "pytest (>=3.6.0)", "pytest-cov", "pytz"]
+
+[[package]]
 name = "isoduration"
 version = "20.11.0"
 description = "Operations with ISO 8601 durations"
@@ -1167,6 +1188,17 @@ openapi = ["openapi-core (>=0.18.0,<0.19.0)", "ruamel-yaml"]
 test = ["hatch", "ipykernel", "openapi-core (>=0.18.0,<0.19.0)", "openapi-spec-validator (>=0.6.0,<0.8.0)", "pytest (>=7.0)", "pytest-console-scripts", "pytest-cov", "pytest-jupyter[server] (>=0.6.2)", "pytest-timeout", "requests-mock", "ruamel-yaml", "sphinxcontrib-spelling", "strict-rfc3339", "werkzeug"]
 
 [[package]]
+name = "jupyterlab-widgets"
+version = "3.0.10"
+description = "Jupyter interactive widgets for JupyterLab"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "jupyterlab_widgets-3.0.10-py3-none-any.whl", hash = "sha256:dd61f3ae7a5a7f80299e14585ce6cf3d6925a96c9103c978eda293197730cb64"},
+    {file = "jupyterlab_widgets-3.0.10.tar.gz", hash = "sha256:04f2ac04976727e4f9d0fa91cdc2f1ab860f965e504c29dbd6a65c882c9d04c0"},
+]
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.5"
 description = "A fast implementation of the Cassowary constraint solver"
@@ -1423,21 +1455,26 @@ files = [
 
 [[package]]
 name = "mlx"
-version = "0.1.0"
+version = "0.2.0"
 description = "A framework for machine learning on Apple silicon."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "mlx-0.1.0-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:2115692ea4944f8d214ebb619159de4226e9970a949a64948ec77e2248a69586"},
-    {file = "mlx-0.1.0-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:aeea9b5f8cbc4d40351e37d6ec1fb23148ed119d965f49f37c6931ff0400a896"},
-    {file = "mlx-0.1.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:e89f55e2a6b0502c84d70de1282e4d872c9c14e9a617ebd2bc15cd8767358bd3"},
-    {file = "mlx-0.1.0-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:b93e81ec7c0eabaf61cfac0e579a4cc4c0de37be21b96ed68d52cd1fd983d089"},
-    {file = "mlx-0.1.0-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:d965656311b017b134198bc8022797f78a5e47ebc6a19e1969249e92fb94124b"},
-    {file = "mlx-0.1.0-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:e0b8dd3f9c60f3038f4dc0c47668e6d1f4857812e0133c220fe6602330c01ad1"},
-    {file = "mlx-0.1.0-cp38-cp38-macosx_13_0_arm64.whl", hash = "sha256:45498f4abfc4d68b3579d154bd543b4a12fa2a49e2cb80f2af53eba3da075c95"},
-    {file = "mlx-0.1.0-cp38-cp38-macosx_14_0_arm64.whl", hash = "sha256:31e8207253e4ecfd616b34315885ab071475d617daac1284fe233eb33c79b809"},
-    {file = "mlx-0.1.0-cp39-cp39-macosx_13_0_arm64.whl", hash = "sha256:85f67eabd15888d7798a502deb502b2e28c28f6bb2cfb549cb6ab527765466ef"},
-    {file = "mlx-0.1.0-cp39-cp39-macosx_14_0_arm64.whl", hash = "sha256:29a108083777ace3525ef8f16666e9439d0a5a80da6e9e27c5de32b407540012"},
+    {file = "mlx-0.2.0-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:019709d86c32051c307a443fac2c2be8d597a647d7fcd0a7b62d1ca234302875"},
+    {file = "mlx-0.2.0-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:40aec5e50f52a2bd5a5cdfb86484693189c4dc414218bc12280a54621da635cb"},
+    {file = "mlx-0.2.0-cp310-cp310-manylinux_2_31_x86_64.whl", hash = "sha256:1cb0771e8916e020c3197cd213c4244fc227c3cd0dab02e77e1c2b6260a44e7f"},
+    {file = "mlx-0.2.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:ddd60ac1c8867acfdf7f10ed09c5434c757b0ce335f2964905bd67493d79b3bd"},
+    {file = "mlx-0.2.0-cp311-cp311-macosx_14_0_arm64.whl", hash = "sha256:c9d71a678184c88b65ff654f639fdbeea5ceaea3555c5e82a6e6a77312b63fc8"},
+    {file = "mlx-0.2.0-cp311-cp311-manylinux_2_31_x86_64.whl", hash = "sha256:a2a92caac0942fc63ce5dc9be76e35111805f412a9f111ba936185246509eca3"},
+    {file = "mlx-0.2.0-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:9039f6219f9095b866af90d4f471e16544ef1b03c8e10596633e327cf73aed31"},
+    {file = "mlx-0.2.0-cp312-cp312-macosx_14_0_arm64.whl", hash = "sha256:399902e2532b52d4210c9f52143dd6fd263e4e974d6c17d8b2ee76d481f493f3"},
+    {file = "mlx-0.2.0-cp312-cp312-manylinux_2_31_x86_64.whl", hash = "sha256:e5b170f29c078eeb62979f4bd378acae8c6a7f18311229a981a622bfd8ff9c2e"},
+    {file = "mlx-0.2.0-cp38-cp38-macosx_13_0_arm64.whl", hash = "sha256:f60e6cb8d338df59e894cd8f37937185ff4054b042c74fca57bceb2139f03d87"},
+    {file = "mlx-0.2.0-cp38-cp38-macosx_14_0_arm64.whl", hash = "sha256:a70d46558b8f63fe53c5fafe5e0c59b17d4e3689b15fe1362c4cff31fb25c1d2"},
+    {file = "mlx-0.2.0-cp38-cp38-manylinux_2_31_x86_64.whl", hash = "sha256:8fb9bf85fb502dc057629c7785a7737a8fe73343fc7491ddff598215eccaa0df"},
+    {file = "mlx-0.2.0-cp39-cp39-macosx_13_0_arm64.whl", hash = "sha256:923b9fa025dac20c34ceb4efc20f960c001e5d1edaaddf9e98f167b24cf09cbe"},
+    {file = "mlx-0.2.0-cp39-cp39-macosx_14_0_arm64.whl", hash = "sha256:987695451ebec260acf141fcaf4e5c71abdad5df2cd84b8d43f14a80438b37a0"},
+    {file = "mlx-0.2.0-cp39-cp39-manylinux_2_31_x86_64.whl", hash = "sha256:f56da3149daee4fb3d55319a68cd3acb61316b0376b11247845edd74ce076720"},
 ]
 
 [package.extras]
@@ -2029,6 +2066,20 @@ files = [
 
 [package.extras]
 tests = ["pytest"]
+
+[[package]]
+name = "py3dmol"
+version = "2.0.4"
+description = "An IPython interface for embedding 3Dmol.js views in Jupyter notebooks"
+optional = false
+python-versions = "*"
+files = [
+    {file = "py3Dmol-2.0.4-py2.py3-none-any.whl", hash = "sha256:356a3a9fee9c48be9b010228790ce394bd4d90d3fd47448964fcbfa6dc5e0a84"},
+    {file = "py3Dmol-2.0.4.tar.gz", hash = "sha256:07909c587ba7e40d17e2ca9383193ead807af834f9569b108cff784ec4cfb525"},
+]
+
+[package.extras]
+ipython = ["IPython"]
 
 [[package]]
 name = "pycparser"
@@ -2726,6 +2777,26 @@ files = [
 ]
 
 [[package]]
+name = "tqdm"
+version = "4.66.2"
+description = "Fast, Extensible Progress Meter"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "tqdm-4.66.2-py3-none-any.whl", hash = "sha256:1ee4f8a893eb9bef51c6e35730cebf234d5d0b6bd112b0271e10ed7c24a02bd9"},
+    {file = "tqdm-4.66.2.tar.gz", hash = "sha256:6cd52cdf0fef0e0f543299cfc96fec90d7b8a7e88745f411ec33eb44d5ed3531"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "platform_system == \"Windows\""}
+
+[package.extras]
+dev = ["pytest (>=6)", "pytest-cov", "pytest-timeout", "pytest-xdist"]
+notebook = ["ipywidgets (>=6)"]
+slack = ["slack-sdk"]
+telegram = ["requests"]
+
+[[package]]
 name = "traitlets"
 version = "5.14.1"
 description = "Traitlets Python configuration system"
@@ -2869,7 +2940,18 @@ docs = ["Sphinx (>=6.0)", "sphinx-rtd-theme (>=1.1.0)"]
 optional = ["python-socks", "wsaccel"]
 test = ["websockets"]
 
+[[package]]
+name = "widgetsnbextension"
+version = "4.0.10"
+description = "Jupyter interactive widgets for Jupyter Notebook"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "widgetsnbextension-4.0.10-py3-none-any.whl", hash = "sha256:d37c3724ec32d8c48400a435ecfa7d3e259995201fbefa37163124a9fcb393cc"},
+    {file = "widgetsnbextension-4.0.10.tar.gz", hash = "sha256:64196c5ff3b9a9183a8e699a4227fb0b7002f252c814098e66c4d1cd0644688f"},
+]
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "077d6cfab458ae260174b08bcea7aa77f1d9d0d4451128d0930986734680ce7f"
+content-hash = "ddf978ee8db0ddb5a469d973fb651b8173b87a1958ee38b7d0451e2e62836625"
