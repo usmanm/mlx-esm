@@ -65,7 +65,7 @@ class Trainer(object):
     return self.run("train", max_iters or self.config.max_iters)
 
   def validate(self, max_iters: Optional[int] = None):
-    return self.run("train", max_iters or int(self.config.max_iters * 0.1))
+    return self.run("validate", max_iters or int(self.config.max_iters * 0.1))
 
   def run(self, split: DataSplit, max_iters: int):
     model = self.model
