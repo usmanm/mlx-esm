@@ -1,6 +1,3 @@
-import random
-from typing import Optional
-
 import mlx.core as mx
 import numpy as np
 from tqdm.auto import tqdm
@@ -11,12 +8,10 @@ from mlx_esm.model import ESM1
 
 def generate(
   model: ESM1,
-  length: Optional[int] = None,
+  length: int,
   max_iters: int = 256,
   max_prob_only: bool = False,
 ):
-  length = length or random.randint(32, 96)
-
   start_seq = "^" + "*" * length + "$"
   return impl(model, start_seq, max_iters, max_prob_only)
 

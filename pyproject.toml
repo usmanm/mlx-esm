@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "mlx-esm"
 version = "0.1.0"
-description = "Implementation of Meta's esm in mlx"
+description = "Implementation of Meta's ESM-1 in MLX"
 authors = ["Usman Masood <usmanm@fastmail.fm>"]
 readme = "README.md"
 
