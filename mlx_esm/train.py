@@ -25,8 +25,8 @@ class Config(object):
   # The answer to the ultimate question of life, the universe, and everything.
   seed: int = 42
 
-  dbs: list[int] = field(default_factory=lambda: [1, 2, 3])
-  max_iters: int = 100_000
+  dataset_partitions: list[int] = field(default_factory=lambda: [1, 2, 3])
+  num_iters: int = 100_000
   batch_size: int = 16
   learning_rate: float = 0.01
   mask_rate: float = 0.15
@@ -44,7 +44,7 @@ class Trainer(object):
 
     self.loader = Loader(
       self.model.tokenizer,
-      self.config.dbs,
+      self.config.dataset_partitions,
       self.config.batch_size,
       self.config.max_seq_len,
       self.config.mask_rate,
@@ -61,13 +61,13 @@ class Trainer(object):
     print("📥 loading data")
     self.loader.load()
 
-  def train(self, max_iters: Optional[int] = None):
-    return self.run("train", max_iters or self.config.max_iters)
+  def train(self, num_iters: Optional[int] = None):
+    return self.run("train", num_iters or self.config.num_iters)
 
-  def validate(self, max_iters: Optional[int] = None):
-    return self.run("validate", max_iters or int(self.config.max_iters * 0.1))
+  def validate(self, num_iters: Optional[int] = None):
+    return self.run("validate", num_iters or int(self.config.num_iters * 0.1))
 
-  def run(self, split: DataSplit, max_iters: int):
+  def run(self, split: DataSplit, num_iters: int):
     model = self.model
     config = self.config
     loader = self.loader
@@ -107,7 +107,7 @@ class Trainer(object):
     self.last_log_time = time.time()
 
     loop = tqdm(
-      range(max_iters or config.max_iters),
+      range(num_iters or config.num_iters),
       ncols=120,
       desc=desc,
       postfix={"loss": "NaN"},

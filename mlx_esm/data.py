@@ -29,11 +29,11 @@ def extract_gz_file(gz_path: str, dest_path: str):
     shutil.copyfileobj(f_in, f_out)
 
 
-def load_uniparc_dbs(ids: list[int]) -> list[str]:
-  return [item for _id in ids for item in load_uniparc_db(_id)]
+def load_uniparc_dataset_partitions(ids: list[int]) -> list[str]:
+  return [item for _id in ids for item in load_uniparc_dataset_partition(_id)]
 
 
-def load_uniparc_db(_id: int) -> list[str]:
+def load_uniparc_dataset_partition(_id: int) -> list[str]:
   assert 0 < _id <= 200
 
   filename = "uniparc_active_p%d.fasta" % _id
@@ -90,12 +90,12 @@ class Loader(object):
   def __init__(
     self,
     tokenizer: Tokenizer,
-    dbs: list[int],
+    dataset_partitions: list[int],
     batch_size: int,
     max_seq_len: int,
     mask_rate: float,
   ):
-    self.dbs = sorted(dbs)
+    self.dataset_partitions = sorted(dataset_partitions)
     self.batch_size = batch_size
     self.max_seq_len = max_seq_len
     self.mask_rate = mask_rate
@@ -106,7 +106,7 @@ class Loader(object):
   def load(self):
     if self.data is not None:
       return
-    sequences = load_uniparc_dbs(self.dbs)
+    sequences = load_uniparc_dataset_partitions(self.dataset_partitions)
     self.data = [s for s in sequences if len(s) <= self.max_seq_len]
     random.shuffle(self.data)
 
