@@ -80,6 +80,11 @@ I ran these sequences through [AlphaFold](https://github.com/google-deepmind/alp
 
 Lo and behold, here's how these sequences look.
 
+<img width="400" alt="SequenceOne" src="https://github.com/usmanm/mlx-esm/assets/853039/20ce8b42-b676-4987-997e-91f13d459e9e">
+<img width="400" alt="SequenceTwo" src="https://github.com/usmanm/mlx-esm/assets/853039/0b3d3540-d8ce-4bae-8953-a2372f57ac4a">
+<img width="401" alt="SequenceThree" src="https://github.com/usmanm/mlx-esm/assets/853039/e5c7b5d7-5818-4328-b15d-35a9f57e8dab">
+<img width="400" alt="SequenceFour" src="https://github.com/usmanm/mlx-esm/assets/853039/2254b85a-9ed0-429c-8d48-a5cf274a3995">
+
 ## Take Aways
 
 Open-source ML feels like it's in a really dope spot. We have suddenly unlocked the ability to train really large neural nets, thanks to Nvidia and Transformers. We have both the compute and an architecture that scales with compute. Meta's decision to open-source their AI work allows anyone really to start playing around with these models. 
