@@ -53,6 +53,8 @@ You can now train your own ESM1 model. The training script will download [UniPar
 
 On my Macbook Air M2, training with the default parameters took about 1 hour and 41 minutes. The loss curve looks sensical, so I assume by model is working to some degree.
 
+<img width="600" alt="Training Loss" src="https://github.com/usmanm/mlx-esm/assets/853039/f9d10ccd-abb1-45b9-9a4d-bbb8b9ea2770">
+
 ### Inference
 
 There are two inference modes:
