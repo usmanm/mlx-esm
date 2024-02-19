@@ -7,7 +7,7 @@ import mlx.nn as nn
 from mlx_esm.data import Tokenizer
 
 
-def count_parameters(params: Union[list, dict]) -> int:
+def count_parameters(params: Union[list, dict, mx.array]) -> int:
   if isinstance(params, mx.array):
     return params.size
   if isinstance(params, list):
@@ -134,6 +134,7 @@ class LayerNorm(nn.Module):
     Construct a layernorm layer in the TF style (eps inside the sqrt).
     """
     super(LayerNorm, self).__init__()
+
     self.embed_dims = embed_dims
     self.eps = eps
     self.weight = mx.ones(embed_dims)

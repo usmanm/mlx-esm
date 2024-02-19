@@ -13,6 +13,7 @@ from tqdm.auto import tqdm
 from mlx_esm.data import DataSplit, Loader
 from mlx_esm.model import ESM1
 from mlx_esm.tokenizer import Tokenizer
+from mlx_esm.utils import tqdm_ncols
 
 
 def set_seed(seed: int):
@@ -108,7 +109,7 @@ class Trainer(object):
 
     loop = tqdm(
       range(num_iters or config.num_iters),
-      ncols=120,
+      ncols=tqdm_ncols(),
       desc=desc,
       postfix={"loss": "NaN"},
     )
@@ -128,8 +129,13 @@ class Trainer(object):
     avg_loss = sum(window) / len(window)
     return avg_loss
 
-  def plot_loss(self, split: DataSplit, bucket_size: int = 1000):
-    losses = self.losses[split]
+  def plot_loss(
+    self,
+    split: DataSplit,
+    bucket_size: int = 1000,
+    start_idx: int = 0,
+  ):
+    losses = self.losses[split][start_idx:]
 
     xs = range(len(losses))
     ys = losses
@@ -137,10 +143,11 @@ class Trainer(object):
     # We will bucket the losses to make the plot more readable.
     bucketed_xs = range(0, len(xs), bucket_size)
     bucketed_ys = [
-      sum(ys[i : i + bucket_size]) / bucket_size for i in range(0, len(ys), bucket_size)
+      sum(ys[i : i + bucket_size]) / len(ys[i : i + bucket_size]) for i in range(0, len(ys), bucket_size)
     ]
 
     plt.xlabel("iteration")
     plt.ylabel("loss")
     plt.plot(bucketed_xs, bucketed_ys)
+    plt.title(f"{'Training' if split == 'train' else 'Validation'} Loss")
     plt.show()
