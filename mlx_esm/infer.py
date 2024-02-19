@@ -4,6 +4,7 @@ from tqdm.auto import tqdm
 
 from mlx_esm.data import Tokenizer
 from mlx_esm.model import ESM1
+from mlx_esm.utils import tqdm_ncols
 
 
 def generate(
@@ -37,7 +38,7 @@ def impl(model: ESM1, input: str, max_iters: int, max_prob_only: bool):
   total = (toks == tokenizer.mask_idx).sum().item()
   loop = tqdm(
     total=total,
-    ncols=120,
+    ncols=tqdm_ncols(),
     desc="🌱 generating",
   )
   for _ in range(max_iters):
