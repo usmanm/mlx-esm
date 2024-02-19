@@ -93,7 +93,7 @@ Lo and behold, here's how these sequences may look.
 <img width="401" alt="SequenceThree" src="https://github.com/usmanm/mlx-esm/assets/853039/e5c7b5d7-5818-4328-b15d-35a9f57e8dab">
 <img width="400" alt="SequenceFour" src="https://github.com/usmanm/mlx-esm/assets/853039/2254b85a-9ed0-429c-8d48-a5cf274a3995">
 
-*Please note that these sequences are almost certainly not valid proteins. The model is too small and trained on very little data. Moreover, my implementation like has subtle bugs that I haven't discovered.*
+*Please note that these sequences are almost certainly not valid proteins. The model is too small and trained on very little data. Moreover, my implementation likely has some subtle bugs that I haven't discovered.*
 
 ## Takeaways
 
