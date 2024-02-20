@@ -51,7 +51,7 @@ You can now train your own ESM1 model. The training script will download [UniPar
 💾 weights saved to ./weights/esm1-202402151405.npz
 ```
 
-On my Macbook Air M2, training with the default parameters took about 1 hour and 41 minutes. The loss curve looks sensical, so I assume by model is working to some degree.
+On my Macbook Air M2, training with the default parameters took about 1 hour and 41 minutes. The loss curve looks sensical, so I assume my model is working to some degree.
 
 <img width="600" alt="Training Loss" src="https://github.com/usmanm/mlx-esm/assets/853039/f9d10ccd-abb1-45b9-9a4d-bbb8b9ea2770">
 
@@ -59,7 +59,7 @@ On my Macbook Air M2, training with the default parameters took about 1 hour and
 
 There are two inference modes:
 - `generate`: This generates a new protein from scratch in an auto-regressive manner. You can specify `--length` to control the size of the protein. By default, a random length from the range `[32, 96)` will be picked.
-- `unmask`: This takes a masked proteins sequence (some amino acids using a `*` character) and replaces the masked token with an amino acid.
+- `unmask`: This takes a masked proteins sequence (some amino acids hidden with `*` character) and replaces the masked tokens with amino acid predictions.
 
 ```
 ➜  poetry run cli generate --weights-file=./weights/202402151405.npz
