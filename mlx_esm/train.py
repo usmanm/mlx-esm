@@ -143,7 +143,8 @@ class Trainer(object):
     # We will bucket the losses to make the plot more readable.
     bucketed_xs = range(0, len(xs), bucket_size)
     bucketed_ys = [
-      sum(ys[i : i + bucket_size]) / len(ys[i : i + bucket_size]) for i in range(0, len(ys), bucket_size)
+      sum(ys[i : i + bucket_size]) / len(ys[i : i + bucket_size])
+      for i in range(0, len(ys), bucket_size)
     ]
 
     plt.xlabel("iteration")
